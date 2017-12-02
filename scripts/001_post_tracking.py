@@ -118,8 +118,17 @@ def get_dir(my_system):
     else:
         experiment_folder = "/Users/degoldschmidt/Google Drive/PhD Project/Experiments/001-DifferentialDeprivation/"
     raw_folder = os.path.join(experiment_folder, "data/raw/")
-    video_folder = os.path.join(experiment_folder, "data/videos/")
-    num_videos = len([eachavi for eachavi in os.listdir(video_folder) if eachavi.endswith("avi")])
+    if my_system == 'nt':
+        video_folder = os.path.join(experiment_folder, "data/videos/")
+        num_videos = len([eachavi for eachavi in os.listdir(video_folder) if eachavi.endswith("avi")])
+    else:
+        video_folder = ""
+        count = 0
+        for dirs in os.listdir(raw_folder):
+            this_dir = os.path.join(raw_folder,dirs)
+            if os.path.isdir(this_dir):
+                count += (len(os.listdir(this_dir)) >= 10)
+        num_videos = count
     print("Start analysis for experiment: {}".format(os.path.basename(os.path.dirname(experiment_folder))))
     print("Found {} videos in experiment folder.".format(num_videos))
     return raw_folder, video_folder, num_videos
@@ -127,22 +136,37 @@ def get_dir(my_system):
 """
 Returns dictionary of all raw data files
 """
-def get_files(timestampstring, basedir, video):
-    return {
+def get_files(timestampstring, basedir, video, noVideo=False):
+    if noVideo:
+        return {
+                        "data" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "fly" in eachfile and timestampstring in eachfile],
+                        "food" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "food" in eachfile and timestampstring in eachfile],
+                        "geometry" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "geometry" in eachfile and timestampstring in eachfile][0],
+                        "timestart" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "timestart" in eachfile and timestampstring in eachfile][0],
+        }
+    else:
+        return {
                     "data" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "fly" in eachfile and timestampstring in eachfile],
                     "food" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "food" in eachfile and timestampstring in eachfile],
                     "geometry" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "geometry" in eachfile and timestampstring in eachfile][0],
                     "timestart" : [os.path.join(basedir, eachfile) for eachfile in os.listdir(basedir) if "timestart" in eachfile and timestampstring in eachfile][0],
                     "video" : [os.path.join(video, eachfile) for eachfile in os.listdir(video) if timestampstring in eachfile][0],
-    }
+                    }
 
+"""
+Returns metadata from session folder
+"""
+def get_meta(timestampstr, dtstamp):
+    pass
 
 """
 Returns timestamp from session folder
 """
 def get_time(session):
     from datetime import datetime
-    any_file = os.listdir(session)[0]
+    for each in os.listdir(session):
+        if "timestart" in each:
+            any_file = each
     timestampstr = any_file.split('.')[0][-19:-3]
     dtstamp = datetime.strptime(timestampstr, "%Y-%m-%dT%H_%M")
     return dtstamp, timestampstr
@@ -186,6 +210,7 @@ if __name__ == '__main__':
     parser.add_argument("-to", action='store', dest='end_session', help='Store a end session')
     parser.add_argument("-fly", action='store', dest='flies', help='Store a end session')
     args = parser.parse_args()
+    print("noVideo:", (os.name != "nt"))
 
     ## define full directory path and filenames
     tk.Tk().withdraw()
@@ -199,7 +224,7 @@ if __name__ == '__main__':
         print("\nStart post-tracking analysis for session: {:02d}".format(each_session))
         dtstamp, timestampstr = get_time(session_folder)
         print("Timestamp:", dtstamp.strftime("%A, %d. %B %Y %H:%M"))
-        allfiles = get_files(timestampstr, session_folder, video)
+        allfiles = get_files(timestampstr, session_folder, video, noVideo = (os.name != "nt"))
 
         ### these are the raw data files
         filenames = allfiles['data']
