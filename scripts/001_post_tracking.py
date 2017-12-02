@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
+import warnings
 
 def get_distance(pt1, pt2):
     return np.sqrt((pt1[0]-pt2[0])*(pt1[0]-pt2[0]) + (pt1[1]-pt2[1])*(pt1[1]-pt2[1]))
@@ -46,27 +47,6 @@ def get_frame_skips(data, println=False):
         print('Skips of more than 1 frames (>{:1.3f} s): {:} ({:3.3f}% of all frames)'.format((1/30)+(1/30), strict_skips, 100*strict_skips/total))
         print('Skips of more than 10 frames (>{:1.3f} s): {:} ({:3.3f}% of all frames)'.format((1/30)+(1/3), easy_skips, 100*easy_skips/total))
     return strict_skips, easy_skips
-
-def load_data(filename):
-    ## test, whether header is provided as first row in file
-    test_header = pd.read_csv(filename, sep="\s+", nrows=0)
-    test_header = [col for col in test_header.columns]
-    # if header contains 'NaN', it is probably data
-    use_header = None
-    renaming = ['datetime []', 'elapsed_time [s]', 'frame_dt [s]', 'body_x [px]', 'body_y [px]', 'angle [rad]', 'major [px]', 'minor [px]']
-    if 'NaN' in test_header:
-        skipr = 0
-    else:
-        skipr = 1
-    ## load data
-    raw_data = pd.read_csv(filename, sep="\s+", header=use_header, skiprows=skipr) ### TODO: HEADER for centroid data
-    new_datetimes = raw_data[0]
-    new_datetimes = pd.to_datetime(new_datetimes)
-    raw_data[0] = new_datetimes
-    # renaming columns with standard header
-    if use_header is None:
-        raw_data.columns = renaming
-    return raw_data
 
 def translate_to(data, filename):
     filestart = np.loadtxt(allfiles['timestart'], dtype=bytes).astype(str)
@@ -108,16 +88,47 @@ def plotting(data, indices, vidfile):
     return f, axes
 
 """
+Returns arguments from CLI
+"""
+def get_args():
+    ### parsing arguments
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-from', action='store', dest='start_session', help='Store a start session')
+    parser.add_argument("-to", action='store', dest='end_session', help='Store a end session')
+    parser.add_argument("-fly", action='store', dest='flies', help='Store a end session')
+    return parser.parse_args()
+
+"""
+Returns list of raw data for filenames
+"""
+def get_data(filenames):
+    renaming = ['datetime []', 'elapsed_time [s]', 'frame_dt [s]', 'body_x [px]', 'body_y [px]', 'angle [rad]', 'major [px]', 'minor [px]']
+    data = []
+    for each in filenames:
+        ## load data
+        data.append(pd.read_csv(each, sep="\s+", skiprows=1))
+        # renaming columns with standard header
+        data[-1].columns = renaming
+        # datetime strings to datetime objects
+        data[-1]['datetime []'] =  pd.to_datetime(data[-1]['datetime []'])
+    return data
+
+"""
 Returns raw and video folder of the experiment
 """
-def get_dir(my_system):
+def get_dir(my_system, exp):
     ##openfilename = filedialog.askopenfilename()
     #openfilename = "/Users/degoldschmidt/Google Drive/PhD Project/Tracking Analysis/tracking test/data/02/cam01_2017-11-21T14_10_06.avi"
     if my_system == 'nt':
-        experiment_folder = "E:/Dennis/Google Drive/PhD Project/Experiments/001-DifferentialDeprivation/"
+        system_folder = "E:/Dennis/Google Drive/PhD Project/Experiments/"
     else:
-        experiment_folder = "/Users/degoldschmidt/Google Drive/PhD Project/Experiments/001-DifferentialDeprivation/"
+        system_folder = "/Users/degoldschmidt/Google Drive/PhD Project/Experiments/"
+    if exp == "DIFF":
+        experiment_folder = os.path.join(system_folder, "001-DifferentialDeprivation/")
+
     raw_folder = os.path.join(experiment_folder, "data/raw/")
+    manual_folder = os.path.join(experiment_folder, "data/manual/")
     if my_system == 'nt':
         video_folder = os.path.join(experiment_folder, "data/videos/")
         num_videos = len([eachavi for eachavi in os.listdir(video_folder) if eachavi.endswith("avi")])
@@ -129,9 +140,9 @@ def get_dir(my_system):
             if os.path.isdir(this_dir):
                 count += (len(os.listdir(this_dir)) >= 10)
         num_videos = count
-    print("Start analysis for experiment: {}".format(os.path.basename(os.path.dirname(experiment_folder))))
+    print("Start analysis for experiment: {} [{}]".format(os.path.basename(os.path.dirname(experiment_folder)), exp))
     print("Found {} videos in experiment folder.".format(num_videos))
-    return raw_folder, video_folder, num_videos
+    return experiment_folder, raw_folder, video_folder, manual_folder, num_videos
 
 """
 Returns dictionary of all raw data files
@@ -154,10 +165,37 @@ def get_files(timestampstring, basedir, video, noVideo=False):
                     }
 
 """
+Returns frame dimensions as tuple (height, width, channels)
+"""
+def get_frame_dims(filename):
+    import skvideo.io
+    videogen = skvideo.io.vreader(filename)
+    for frame in videogen:
+        dims = frame.shape
+        break
+    return dims
+
+"""
 Returns metadata from session folder
 """
-def get_meta(timestampstr, dtstamp):
-    pass
+def get_meta(allfiles, dtstamp):
+    print("Metadata:")
+    print("")
+
+"""
+Returns number of frames from raw data
+"""
+def get_num_frames(data):
+    assert (all(len(x.index) == len(data[0].index) for x in data)), "All files should have same number of frames!"
+    return len(data[0].index)
+
+"""
+Returns datetime for session start
+"""
+def get_session_start(filename):
+    from datetime import datetime
+    filestart = np.loadtxt(filename, dtype=bytes).astype(str)
+    return datetime.strptime(filestart[1][:19], '%Y-%m-%dT%H:%M:%S')
 
 """
 Returns timestamp from session folder
@@ -167,9 +205,27 @@ def get_time(session):
     for each in os.listdir(session):
         if "timestart" in each:
             any_file = each
-    timestampstr = any_file.split('.')[0][-19:-3]
-    dtstamp = datetime.strptime(timestampstr, "%Y-%m-%dT%H_%M")
-    return dtstamp, timestampstr
+    timestampstr = any_file.split('.')[0][-19:]
+    dtstamp = datetime.strptime(timestampstr, "%Y-%m-%dT%H_%M_%S")
+    return dtstamp, timestampstr[:-3]
+
+"""
+Returns list of directories in given path d with full path
+"""
+def flistdir(d):
+    return [os.path.join(d, f) for f in os.listdir(d)]
+
+"""
+Plot figs along program flow
+"""
+def plot_along(f, ax):
+    warnings.filterwarnings("ignore")
+    f.show()
+    try:
+        f.canvas.start_event_loop(0)
+    except tk.TclError:
+        pass
+    warnings.filterwarnings("default")
 
 """
 Print dictionary prettier
@@ -203,18 +259,11 @@ def sessions_from_args(args):
     return start, end
 
 if __name__ == '__main__':
-    ### parsing arguments
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-from', action='store', dest='start_session', help='Store a start session')
-    parser.add_argument("-to", action='store', dest='end_session', help='Store a end session')
-    parser.add_argument("-fly", action='store', dest='flies', help='Store a end session')
-    args = parser.parse_args()
-    print("noVideo:", (os.name != "nt"))
-
+    args = get_args()
     ## define full directory path and filenames
     tk.Tk().withdraw()
-    raw, video, n = get_dir(os.name)
+    EXP_ID = "DIFF"
+    exp, raw, video, manual, n = get_dir(os.name, EXP_ID)
 
     ### go through SESSIONS
     start, end = sessions_from_args(args)
@@ -228,12 +277,56 @@ if __name__ == '__main__':
 
         ### these are the raw data files
         filenames = allfiles['data']
+        ### get data from files as list of DataFrames
+        print("Loading raw data...", flush=True, end="")
+        raw_data = get_data(filenames)
+        print("Done.")
+
 
         ### getting metadata
-        meta_dict = get_meta(timestampstr, dtstamp)
+        meta = {}
+        meta['datadir'] = os.path.join(exp.split('/')[-2], "each_session")
+        meta['experiment'] = EXP_ID
+        dims = get_frame_dims(allfiles["video"])
+        meta['frame_height'] = dims[0]
+        meta['frame_width'] = dims[1]
+        meta['frame_channels'] = dims[2]
+        meta['num_frames'] = get_num_frames(raw_data)
+        meta['session_start'] = get_session_start(allfiles["timestart"])
+        meta['video'] = os.path.basename(allfiles["video"])
+        meta['video_start'] = dtstamp
 
-        alldata = []
-        skip = 0
+        ### get conditions files
+        meta["files"] = flistdir(manual)
+        meta["conditions"] =  [os.path.basename(each).split('.')[0] for each in meta["files"]]
+        meta["variables"] = []
+        for ix, each in enumerate(meta["files"]):
+            with open(each, "r") as f:
+                lines = f.readlines()
+                if len(lines) > 1:
+                    meta["variables"].append(meta["conditions"][ix])
+                else:
+                    meta[meta["conditions"][ix]] = lines[0]
+
+        print(meta)
+        #meta_dict = get_meta(allfiles, dtstamp)
+        ### SESSION FILE NAME
+
+
+
+        """ PLOTTING ALONG USE
+        f, ax = plt.subplots()
+        ax.plot(np.arange(40), 'r-')
+        plot_along(f, ax)
+        """
+
+        for ix, eachfile in enumerate(filenames):
+            flymeta = meta.copy()
+            flyid = ix + (each_session-1)*4 + 1
+            print("{}_{:03d}.csv".format(EXP_ID, flyid))
+            flymeta['datafile'] = "{}_{:03d}.csv".format(EXP_ID, flyid)
+            print(len(flymeta.keys()), len(meta.keys()))
+
         """
         for ix, eachfile in enumerate(filenames[skip:]):
             print(basedir, filetimestamp, eachfile)
