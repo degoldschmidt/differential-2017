@@ -209,6 +209,7 @@ if __name__ == '__main__':
 
         alldata = []
         skip = 0
+        """
         for ix, eachfile in enumerate(filenames[skip:]):
             print(basedir, filetimestamp, eachfile)
             ### 1) Load raw data file
