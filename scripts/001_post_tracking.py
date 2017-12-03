@@ -88,6 +88,14 @@ def plotting(data, indices, vidfile):
     return f, axes
 
 """
+Returns angle between to given points centered on pt1
+"""
+def get_angle(pt1, pt2):
+    dx = pt2[0]-pt1[0]
+    dy = pt2[1]-pt1[1]
+    return np.arctan2(dy,dx)
+
+"""
 Returns arguments from CLI
 """
 def get_args():
@@ -103,6 +111,7 @@ def get_args():
 Returns list of raw data for filenames
 """
 def get_data(filenames):
+    print("Loading raw data...", flush=True, end="")
     renaming = ['datetime []', 'elapsed_time [s]', 'frame_dt [s]', 'body_x [px]', 'body_y [px]', 'angle [rad]', 'major [px]', 'minor [px]']
     data = []
     for each in filenames:
@@ -112,6 +121,7 @@ def get_data(filenames):
         data[-1].columns = renaming
         # datetime strings to datetime objects
         data[-1]['datetime []'] =  pd.to_datetime(data[-1]['datetime []'])
+    print("done.")
     return data
 
 """
@@ -145,6 +155,14 @@ def get_dir(my_system, exp):
     return experiment_folder, raw_folder, video_folder, manual_folder, num_videos
 
 """
+Returns distance between to given points
+"""
+def get_distance(pt1, pt2):
+    dx = pt1[0]-pt2[0]
+    dy = pt1[1]-pt2[1]
+    return np.sqrt(dx**2 + dy**2)
+
+"""
 Returns dictionary of all raw data files
 """
 def get_files(timestampstring, basedir, video, noVideo=False):
@@ -165,15 +183,47 @@ def get_files(timestampstring, basedir, video, noVideo=False):
                     }
 
 """
+Returns food spots data
+"""
+def get_food(filenames):
+    data = []
+    for each in filenames:
+        eachdata = np.loadtxt(each)
+        if len(eachdata.shape) == 1:
+            eachdata = np.reshape(eachdata, (1, 2))
+        ## load data
+        data.append(eachdata)
+    return data
+
+"""
 Returns frame dimensions as tuple (height, width, channels)
 """
 def get_frame_dims(filename):
+    warnings.filterwarnings("ignore")
     import skvideo.io
     videogen = skvideo.io.vreader(filename)
     for frame in videogen:
         dims = frame.shape
         break
+    warnings.filterwarnings("default")
     return dims
+
+"""
+Returns list of raw data for filenames
+"""
+def get_geom(filename):
+    print("Loading geometry data...", flush=True, end="")
+    renaming = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4', 'O1', 'L1', 'M1', 'O2', 'L2', 'M2', 'O3', 'L3', 'M3',  'O4', 'L4', 'M4']
+    ## load data
+    data = pd.read_csv(filename, sep="\s+")
+    data.columns = renaming
+    data['R1'] = 0.25*(data['L1']+data['M1'])  ### radius = half of mean of major and minor
+    data['R2'] = 0.25*(data['L2']+data['M2'])  ### radius = half of mean of major and minor
+    data['R3'] = 0.25*(data['L3']+data['M3'])  ### radius = half of mean of major and minor
+    data['R4'] = 0.25*(data['L4']+data['M4'])  ### radius = half of mean of major and minor
+    data = data.loc[:, ['X1', 'Y1', 'R1', 'X2', 'Y2', 'R2', 'X3', 'Y3', 'R3', 'X4', 'Y4', 'R4']]
+    print("done.")
+    return [(data.loc[len(data.index)-1, 'X'+str(ix+1)], data.loc[len(data.index)-1, 'Y'+str(ix+1)], data.loc[len(data.index)-1, 'R'+str(ix+1)]) for ix in range(4)]
 
 """
 Returns metadata from session folder
@@ -228,6 +278,42 @@ def plot_along(f, ax):
     warnings.filterwarnings("default")
 
 """
+Plot figs along program flow
+"""
+def plot_overlay(vidfile, arenas=[], spots=[]):
+    import imageio
+    from matplotlib.patches import Circle
+    vid = imageio.get_reader(vidfile,  'ffmpeg')
+    f, ax = plt.subplots()
+    image = vid.get_data(0)
+    ax.imshow(image)
+
+    fix_outer = 260
+    for each in arenas:
+        x = each[0]
+        y = each[1]
+        r = each[2] + 30
+        #print("plot circle with center at ({:4.3f}, {:4.3f}) with radius {:3.3f}.".format(x, y, r))
+        circ_outer = Circle((x, y), radius=fix_outer, alpha=0.25, color="#ff45cb")
+        ax.add_artist(circ_outer)
+        circ = Circle((x, y), radius=r, alpha=0.4, color="#0296a4")
+        ax.add_artist(circ)
+        for rad in [30., 120., 212.5]:
+            circ = Circle((x, y), radius=rad, ec="k", fc='none', ls='dashed')
+            ax.add_artist(circ)
+        ax.plot(x, y, marker='+', markersize=10, color="#0296a4")
+    for ix, each_arena in enumerate(spots):
+        x0 = arenas[ix][0] - fix_outer
+        y0 = arenas[ix][1] - fix_outer
+        for each_spot in each_arena:
+            x = each_spot[0] + x0
+            y = each_spot[1] + y0
+            spot_radius = 12.815
+            patch = Circle((x, y), radius=spot_radius, alpha=0.4, color="#ff8d17")
+            ax.add_artist(patch)
+    return f, ax
+
+"""
 Print dictionary prettier
 """
 def print_files(_dict, count=0):
@@ -258,6 +344,38 @@ def sessions_from_args(args):
         end = int(args.end_session)
     return start, end
 
+"""
+Validate food spots
+"""
+def validate_food(spots, geom):
+    fix_outer = 260
+    spot_radius = 12.815
+    for ix, each_arena in enumerate(spots):
+        fx0 = geom[ix][0] - fix_outer
+        fy0 = geom[ix][1] - fix_outer
+        x0 = geom[ix][0]
+        y0 = geom[ix][1]
+        eachout = []
+        for each_spot in each_arena:
+            x = each_spot[0] + fx0
+            y = each_spot[1] + fy0
+            d = get_distance((x0, y0), (x,y))
+            if d > 30. and d < 212.5:
+                print(x, y, d)
+                eachout.append([each_spot[0], each_spot[1]])
+            else:
+                print("Removed: ",x, y, d)
+        spots[ix] = np.array(eachout)
+    return spots
+
+
+"""
+"""
+"""
+MAIN
+"""
+"""
+"""
 if __name__ == '__main__':
     args = get_args()
     ## define full directory path and filenames
@@ -278,13 +396,18 @@ if __name__ == '__main__':
         ### these are the raw data files
         filenames = allfiles['data']
         ### get data from files as list of DataFrames
-        print("Loading raw data...", flush=True, end="")
         raw_data = get_data(filenames)
-        print("Done.")
+        geom_data = get_geom(allfiles['geometry'])
+        food_data = get_food(allfiles['food'])
+        food_data = validate_food(food_data, geom_data)
+        f, ax = plot_overlay(allfiles['video'], arenas=geom_data, spots=food_data)
+        plot_along(f, ax)
+
 
 
         ### getting metadata
         meta = {}
+        meta['arena_geom'] = geom_data
         meta['datadir'] = os.path.join(exp.split('/')[-2], "each_session")
         meta['experiment'] = EXP_ID
         dims = get_frame_dims(allfiles["video"])
@@ -308,7 +431,7 @@ if __name__ == '__main__':
                 else:
                     meta[meta["conditions"][ix]] = lines[0]
 
-        print(meta)
+        #print(meta)
         #meta_dict = get_meta(allfiles, dtstamp)
         ### SESSION FILE NAME
 
@@ -325,7 +448,6 @@ if __name__ == '__main__':
             flyid = ix + (each_session-1)*4 + 1
             print("{}_{:03d}.csv".format(EXP_ID, flyid))
             flymeta['datafile'] = "{}_{:03d}.csv".format(EXP_ID, flyid)
-            print(len(flymeta.keys()), len(meta.keys()))
 
         """
         for ix, eachfile in enumerate(filenames[skip:]):
