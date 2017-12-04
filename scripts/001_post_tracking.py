@@ -233,6 +233,33 @@ def get_meta(allfiles, dtstamp):
     print("")
 
 """
+Returns new spots
+"""
+def get_new_spots(spots, mindist, left=0):
+    new_spot = []
+    for each_spot in spots:
+        mat = rot(120, in_degrees=True)
+        vec = np.array([each_spot[0], each_spot[1]])
+        out = np.dot(mat, vec)
+        x, y = out[0], out[1]
+        dists = [get_distance((spot[0], spot[1]), (x,y)) for spot in spots]
+        for each_distance in dists:
+            if each_distance < mindist:
+                mat = rot(-120, in_degrees=True)
+                vec = np.array([each_spot[0], each_spot[1]])
+                out = np.dot(mat, vec)
+                x, y = out[0], out[1]
+        new_spot.append([x, y])
+        if left > 1:
+            mat = rot(-120, in_degrees=True)
+            vec = np.array([each_spot[0], each_spot[1]])
+            out = np.dot(mat, vec)
+            x, y = out[0], out[1]
+            new_spot.append([x, y])
+    print(new_spot)
+    return new_spot
+
+"""
 Returns number of frames from raw data
 """
 def get_num_frames(data):
@@ -266,10 +293,24 @@ def flistdir(d):
     return [os.path.join(d, f) for f in os.listdir(d)]
 
 """
+Returns rotation matrix for given angle in two dimensions
+"""
+def rot(angle, in_degrees=False):
+    if in_degrees:
+        rads = np.radians(angle)
+        return np.array([[np.cos(rads), -np.sin(rads)],[np.sin(rads), np.cos(rads)]])
+    else:
+        return np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle), np.cos(angle)]])
+
+"""
 Plot figs along program flow
 """
 def plot_along(f, ax):
     warnings.filterwarnings("ignore")
+    mng = plt.get_current_fig_manager()
+    ### works on Ubuntu??? >> did NOT working on windows
+# mng.resize(*mng.window.maxsize())
+    mng.window.state('zoomed') #works fine on Windows!
     f.show()
     try:
         f.canvas.start_event_loop(0)
@@ -293,7 +334,6 @@ def plot_overlay(vidfile, arenas=[], spots=[]):
         x = each[0]
         y = each[1]
         r = each[2] + 30
-        #print("plot circle with center at ({:4.3f}, {:4.3f}) with radius {:3.3f}.".format(x, y, r))
         circ_outer = Circle((x, y), radius=fix_outer, alpha=0.25, color="#ff45cb")
         ax.add_artist(circ_outer)
         circ = Circle((x, y), radius=r, alpha=0.4, color="#0296a4")
@@ -303,13 +343,14 @@ def plot_overlay(vidfile, arenas=[], spots=[]):
             ax.add_artist(circ)
         ax.plot(x, y, marker='+', markersize=10, color="#0296a4")
     for ix, each_arena in enumerate(spots):
-        x0 = arenas[ix][0] - fix_outer
-        y0 = arenas[ix][1] - fix_outer
+        x0 = arenas[ix][0]
+        y0 = arenas[ix][1]
+        colors = ["#ff8d17", "#ff4500", "#009cff"]
         for each_spot in each_arena:
             x = each_spot[0] + x0
             y = each_spot[1] + y0
             spot_radius = 12.815
-            patch = Circle((x, y), radius=spot_radius, alpha=0.4, color="#ff8d17")
+            patch = Circle((x, y), radius=spot_radius, alpha=0.4, color=colors[int(each_spot[2])])
             ax.add_artist(patch)
     return f, ax
 
@@ -351,21 +392,128 @@ def validate_food(spots, geom):
     fix_outer = 260
     spot_radius = 12.815
     for ix, each_arena in enumerate(spots):
-        fx0 = geom[ix][0] - fix_outer
-        fy0 = geom[ix][1] - fix_outer
-        x0 = geom[ix][0]
-        y0 = geom[ix][1]
-        eachout = []
+        print("\nArena:", ix)
+        p0 = geom[ix][0]        # arena center
+        f0 = p0 - fix_outer     # frame origin
+
+        all_spots = []
+
+        n_inner, n_outer = 3, 3 # counter for inner and outer spots found
+
+        ### spots for inner and outer triangle
+        inner, outer = [], []
+
         for each_spot in each_arena:
-            x = each_spot[0] + fx0
-            y = each_spot[1] + fy0
-            d = get_distance((x0, y0), (x,y))
+            spot = each_spot - p0 + f0  ### vector centered around arena center
+            d = get_distance((0, 0), spot)
+            a = get_angle((0, 0), spot)
+
+            ### validate existing spots
             if d > 30. and d < 212.5:
-                print(x, y, d)
-                eachout.append([each_spot[0], each_spot[1]])
+                all_spots.append([spot[0], spot[1], 0])
+                if d < 120.:        ### inner spots
+                    n_inner -= 1
+                    inner.append([spot[0], spot[1], a])
+                    print('near:', spot[0], spot[1], d, np.degrees(a))
+                else:               ### outer spots
+                    n_outer -= 1
+                    outer.append([spot[0], spot[1], a])
+                    print('far:', spot[0], spot[1], d, np.degrees(a))
+            ### removal
             else:
-                print("Removed: ",x, y, d)
-        spots[ix] = np.array(eachout)
+                print("Removed: ", spot[0], spot[1], d)
+
+        ### Check whether existing inner spots are of right number
+        if n_inner < 0:
+            print("Too many inner spots. Removing {} spots.".format(-n_inner))
+            min_dis = 260.
+            ### remove as many spots as needed based on avg distance to all spots
+            for each in range(-n_inner):
+                for ispot, spot in enumerate(inner):
+                    mean_dis = np.mean([get_distance((spot[0], spot[1]), (other[0], other[1])) for other in inner])
+                    if mean_dis < min_dis:
+                        min_dis = mean_dis
+                        remove = ispot
+                all_spots.remove([inner[ispot][0], inner[ispot][1], 0])
+                del inner[ispot]
+
+        ### Check for translation (needs to be after removal of extra spots)
+        if len(inner) == 3:
+            tx, ty = 0, 0
+            for each_spot in inner:
+                tx += each_spot[0]
+                ty += each_spot[1]
+            tx /= len(inner)
+            ty /= len(inner)
+        if len(inner) < 3:
+            tx, ty = 0, 0
+            for each_spot in inner:
+                dr = get_distance((0, 0), (each_spot[0], each_spot[1])) - 85.43 #### This is 10 mm
+                tx += dr * np.cos(get_angle((0, 0), (each_spot[0], each_spot[1])))
+                ty += dr * np.sin(get_angle((0, 0), (each_spot[0], each_spot[1])))
+            tx /= len(inner)
+            ty /= len(inner)
+        print("Translation detected: ({}, {})".format(tx, ty))
+        ### Correcting for translation
+        for spot in inner:
+            spot[0] -= tx
+            spot[1] -= ty
+        for spot in outer:
+            spot[0] -= tx
+            spot[1] -= ty
+        for spot in all_spots:
+            spot[0] -= tx
+            spot[1] -= ty
+
+        if n_inner > 0:
+            print("Too few inner spots. Missing {} spots.".format(n_inner))
+            ### getting new spots by means of rotation
+            near_new = get_new_spots(inner, 80, left=n_inner)
+            ### overlapping spots get averaged to one
+            if get_distance(near_new[0], near_new[1]) < 40.:
+                near_new = [[0.5*(near_new[0][0] + near_new[1][0]), 0.5*(near_new[0][1] + near_new[1][1])]]
+            ### add new one to list of all spots
+            for spot in near_new:
+                all_spots.append([spot[0], spot[1], 1])
+
+        ### Check whether existing outer spots are of right number
+        if n_outer < 0:
+            print("Too many outer spots. Removing {} spots.".format(-n_outer))
+            min_dis = 260.
+            ### remove as many spots as needed based on avg distance to all spots
+            for each in range(-n_outer):
+                for ispot, spot in enumerate(outer):
+                    mean_dis = np.mean([get_distance((spot[0], spot[1]), (other[0], other[1])) for other in inner])
+                    if mean_dis < min_dis:
+                        min_dis = mean_dis
+                        remove = ispot
+                all_spots.remove([inner[ispot][0], inner[ispot][1], 0])
+                del inner[ispot]
+
+        if n_outer > 0:
+            print("Too few outer spots. Missing {} spots.".format(n_outer))
+            far_new = get_new_spots(outer, 250, left=n_outer)
+            ### overlapping spots get averaged to one
+            if get_distance(far_new[0], far_new[1]) < 40.:
+                far_new = [[0.5*(far_new[0][0] + far_new[1][0]), 0.5*(far_new[0][1] + far_new[1][1])]]
+            ### add new one to list of all spots
+            for spot in far_new:
+                all_spots.append([spot[0], spot[1], 1])
+
+        ### Adding sucrose by rotating yeast positions
+        sucrose = []
+        for spot in all_spots:
+            mat = rot(60, in_degrees=True)
+            vec = np.array([spot[0], spot[1]])
+            out = np.dot(mat, vec)
+            sucrose.append([out[0], out[1], 2])
+        # add them all to list
+        for each_spot in sucrose:
+            all_spots.append(each_spot)
+
+        ### return all spots for this arena into list
+        spots[ix] = np.array(all_spots)
+    print()
     return spots
 
 
