@@ -6,7 +6,6 @@ import pytrack_analysis.preprocessing as prp
 from pytrack_analysis import Kinematics
 from pytrack_analysis import Statistics
 from pytrack_analysis import Multibench
-from example_figures import fig_1c, fig_1d, fig_1e_h
 import logging
 
 def main():
