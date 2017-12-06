@@ -231,7 +231,6 @@ def get_meta(allfiles, dtstamp, conditions):
     meta['food_spots'] = food_dict
     ###
     dict_geom = {}
-    labels = ['topleft', 'topright', 'bottomleft', 'bottomright']
     for index, each_arena in enumerate(geom_data):
         dict_geom[labels[index]] = {}
         labels2 = ['x', 'y', 'r']
@@ -746,6 +745,10 @@ def main(args):
             flymeta['frameskips'] = int(skips)
             flymeta['maxskip'] = float(maxskip)
             flymeta['maxskip_index'] = int(max_skip_arg)
+            labels = ['topleft', 'topright', 'bottomleft', 'bottomright']
+            flymeta['arena'] = labels[ix]
+            flymeta['arena_geom'] = flymeta['arena_geom'][labels[ix]]
+            flymeta['food_spots'] = flymeta['food_spots'][labels[ix]]
 
             ### 3) Get start timestamp --> startpos
             raw_data[ix], first_frame = translate_to(raw_data[ix], flymeta['session_start'], time='datetime')
@@ -781,8 +784,8 @@ def main(args):
             ### 7) center around arena center
             labels = ['topleft', 'topright', 'bottomleft', 'bottomright']
             for each in ['head', 'body']:
-                raw_data[ix][each+'_x'] = raw_data[ix][each+'_x'] - flymeta['arena_geom'][labels[ix]]['x']
-                raw_data[ix][each+'_y'] = raw_data[ix][each+'_y'] - flymeta['arena_geom'][labels[ix]]['y']
+                raw_data[ix][each+'_x'] = raw_data[ix][each+'_x'] - flymeta['arena_geom']['x']
+                raw_data[ix][each+'_y'] = raw_data[ix][each+'_y'] - flymeta['arena_geom']['y']
 
             ### 8) Save data to file
             #raw_data[ix]['frame'] = raw_data[ix].index

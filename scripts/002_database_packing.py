@@ -41,30 +41,25 @@ def strfdelta(tdelta, fmt):
 def yaml_dump(_title, _filedir):
     outdict = {}
     fulltitle = _title+'.yaml'
-    outdict[fulltitle] = {}
-    outdict['directory'] = _filedir
+    outdict[fulltitle] = []
+    #outdict['directory'] = _filedir
+    processed = os.path.join(_filedir, 'data/processed/post_tracking')
     sessions = outdict[fulltitle]
-    avis = [eachvidfile for eachvidfile in os.listdir(_filedir) if "avi" in eachvidfile]
-    for j, eachavi in enumerate(avis):
-        print(eachavi)
-        datafiles = [eachdatafile for eachdatafile in os.listdir(_filedir) if "fly" in eachdatafile]
-        for i, eachcsv in enumerate(datafiles):
-            print('\t'+eachcsv)
-            index = "{:04d}".format(i+j*4)
-            sessions[_title+'_'+index] = {}
-            session = sessions[_title+'_'+index]
-            session['video'] = eachavi
-            session['raw_data'] = eachcsv
-            session['valid_data'] = _title+'_'+index+'.csv'
-            session['meta_data'] = _title+'_'+index+'.yaml'
+    datafiles = [eachdatafile for eachdatafile in os.listdir(processed) if '.csv' in eachdatafile]
+    for i, eachcsv in enumerate(datafiles):
+        print('\t'+eachcsv)
+        eachyaml = eachcsv[:-3]+'yaml'
+        print('\t'+eachyaml)
+        if os.path.exists(os.path.join(processed, eachcsv)) and os.path.exists(os.path.join(processed, eachyaml)):
+            sessions.append(eachcsv)
 
     ts_dict = {}
     for session in sessions:
         ts_dict[session] = {}
-        ts_dict[session]["created"] = get_created(os.path.join(_filedir, session+'.csv'))
-        ts_dict[session]["modified"] = get_modified(os.path.join(_filedir, session+'.csv'))
+        ts_dict[session]["created"] = get_created(os.path.join(processed, session))
+        ts_dict[session]["modified"] = get_modified(os.path.join(processed, session))
 
-    with open(os.path.join(_filedir,_title)+'.yaml', 'w+') as outfile:
+    with open(os.path.join(processed,_title)+'.yaml', 'w+') as outfile:
         outfile.write("# This is a database yaml file created for the pyTrack-analysis framework. " + now().strftime("%y-%m-%d %H:%M:%S") + "\n")
         outfile.write("---\n")
         outfile.write("# file structure\n")
@@ -83,8 +78,10 @@ if __name__ == "__main__":
 
     ### enter database name
     name = "DIFF" #input("Please enter database name: ")
+    experiment_folder = os.path.join(_filedir, '001-DifferentialDeprivation')
 
-    yaml_dump(name, _filedir)
+    print(experiment_folder)
+    yaml_dump(name, experiment_folder)
     #filestruct, timestamps = load_yaml(os.path.join(_filedir, name)+".yaml")
     #print(timestamps)
     #json_dump(_filedir)
