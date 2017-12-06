@@ -191,10 +191,10 @@ def get_geom(filename):
     ## load data
     data = pd.read_csv(filename, sep="\s+")
     data.columns = renaming
-    data['R1'] = 0.25*(data['L1']+data['M1'])  ### radius = half of mean of major and minor
-    data['R2'] = 0.25*(data['L2']+data['M2'])  ### radius = half of mean of major and minor
-    data['R3'] = 0.25*(data['L3']+data['M3'])  ### radius = half of mean of major and minor
-    data['R4'] = 0.25*(data['L4']+data['M4'])  ### radius = half of mean of major and minor
+    data['R1'] = 0.25*(data['L1']+data['M1']) + 30 ### radius = half of mean of major and minor
+    data['R2'] = 0.25*(data['L2']+data['M2']) + 30 ### radius = half of mean of major and minor
+    data['R3'] = 0.25*(data['L3']+data['M3']) + 30 ### radius = half of mean of major and minor
+    data['R4'] = 0.25*(data['L4']+data['M4']) + 30 ### radius = half of mean of major and minor
     data = data.loc[:, ['X1', 'Y1', 'R1', 'X2', 'Y2', 'R2', 'X3', 'Y3', 'R3', 'X4', 'Y4', 'R4']]
     print("done.")
     return [(data.loc[len(data.index)-1, 'X'+str(ix+1)], data.loc[len(data.index)-1, 'Y'+str(ix+1)], data.loc[len(data.index)-1, 'R'+str(ix+1)]) for ix in range(4)]
@@ -450,7 +450,7 @@ def plot_overlay(vidfile, arenas=[], spots=[]):
     for each in arenas:
         x = each[0]
         y = each[1]
-        r = each[2] + 30
+        r = each[2]
         circ_outer = Circle((x, y), radius=fix_outer, alpha=0.25, color="#ff45cb")
         ax.add_artist(circ_outer)
         circ = Circle((x, y), radius=r, alpha=0.4, color="#0296a4")
@@ -718,7 +718,7 @@ def main(args):
 
         ### getting metadata
         meta = get_meta(allfiles, dtstamp, manual)
-        meta['datadir'] = os.path.join(exp.split('/')[-2], "each_session")
+        meta['datadir'] = session_folder.split('/')[-2:]
         meta['experiment'] = EXP_ID
         meta['num_frames'] = get_num_frames(raw_data)
         for each_condition in meta['variables']:
@@ -748,7 +748,9 @@ def main(args):
             labels = ['topleft', 'topright', 'bottomleft', 'bottomright']
             flymeta['arena'] = labels[ix]
             flymeta['arena_geom'] = flymeta['arena_geom'][labels[ix]]
+            flymeta['px_per_mm'] = 2.*flymeta['arena_geom']['r'] / 49.75
             flymeta['food_spots'] = flymeta['food_spots'][labels[ix]]
+            flymeta['food_spot_radius'] = 12.815
 
             ### 3) Get start timestamp --> startpos
             raw_data[ix], first_frame = translate_to(raw_data[ix], flymeta['session_start'], time='datetime')
