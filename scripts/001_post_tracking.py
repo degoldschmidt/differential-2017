@@ -11,53 +11,7 @@ import warnings
 from datetime import datetime, timedelta
 from string import Template
 import imageio
-
-
-"""
-Returns angle between to given points centered on pt1 (GEOMETRY)
-"""
-def get_angle(pt1, pt2):
-    dx = pt2[0]-pt1[0]
-    dy = pt2[1]-pt1[1]
-    return np.arctan2(dy,dx)
-
-"""
-Returns arguments from CLI (CLI)
-"""
-def get_args():
-    ### parsing arguments
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-from', action='store', dest='start_session', help='Store a start session')
-    parser.add_argument("-to", action='store', dest='end_session', help='Store a end session')
-    parser.add_argument("-fly", action='store', dest='flies', help='Store a end session')
-    parser.add_argument("-not", action='store', dest='not_this', help='Except certain session')
-    return parser.parse_args()
-
-"""
-Returns list of raw data for filenames (DATAIO)
-"""
-def get_data(filenames):
-    print("Loading raw data...", flush=True, end="")
-    renaming = ['datetime', 'elapsed_time', 'frame_dt', 'body_x', 'body_y', 'angle', 'major', 'minor']
-    units = {   'datetime': 'Datetime',
-                'elapsed_time': 's',
-                'frame_dt': 's',
-                'body_x': 'px',
-                'body_y': 'px',
-                'angle': 'rad',
-                'major': 'px',
-                'minor': 'px'}
-    data = []
-    for each in filenames:
-        ## load data
-        data.append(pd.read_csv(each, sep="\s+", skiprows=1))
-        # renaming columns with standard header
-        data[-1].columns = renaming
-        # datetime strings to datetime objects
-        data[-1]['datetime'] =  pd.to_datetime(data[-1]['datetime'])
-    print("done.")
-    return data, units
+from pytrack_analysis import get_angle
 
 """
 Returns raw and video folder of the experiment (DATAIO)
@@ -112,14 +66,6 @@ def get_disconts(data, thr_disc=80., thr_coh=0.001):        ### TODO: explicit!!
                 else:
                     data.loc[index, 'flags'] = 1
     return data
-
-"""
-Returns distance between to given points (GEOMETRY)
-"""
-def get_distance(pt1, pt2):
-    dx = pt1[0]-pt2[0]
-    dy = pt1[1]-pt2[1]
-    return np.sqrt(dx**2 + dy**2)
 
 """
 Returns dictionary of all raw data files (DATAIO)
@@ -299,7 +245,7 @@ def get_session_start(filename):
     return datetime.strptime(filestart[1][:19], '%Y-%m-%dT%H:%M:%S')
 
 """
-Returns flags to flip the orientation (DATAIO)
+Returns flags to flip the orientation (PROCESSING)
 """
 def get_signs(data, vidfile, only=None, space=300):
     warnings.filterwarnings("ignore")
@@ -403,21 +349,7 @@ def get_time(session):
     dtstamp = datetime.strptime(timestampstr, "%Y-%m-%dT%H_%M_%S")
     return dtstamp, timestampstr[:-3]
 
-"""
-Returns list of directories in given path d with full path (DATAIO)
-"""
-def flistdir(d):
-    return [os.path.join(d, f) for f in os.listdir(d) if '.txt' in f]
 
-"""
-Returns rotation matrix for given angle in two dimensions (GEOMETRY)
-"""
-def rot(angle, in_degrees=False):
-    if in_degrees:
-        rads = np.radians(angle)
-        return np.array([[np.cos(rads), -np.sin(rads)],[np.sin(rads), np.cos(rads)]])
-    else:
-        return np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle), np.cos(angle)]])
 
 """
 Plot figs along program flow (VISUAL)
