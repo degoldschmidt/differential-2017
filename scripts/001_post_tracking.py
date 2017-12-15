@@ -2,9 +2,9 @@ import os
 
 from pytrack_analysis import Multibench
 from pytrack_analysis.cli import get_args
-from pytrack_analysis.dataio import get_data
+from pytrack_analysis.dataio import RawData, get_session_list
 from pytrack_analysis.profile import get_profile, get_scriptname, show_profile
-from pytrack_analysis.posttracking import get_files, get_frame_skips, get_session_list
+from pytrack_analysis.posttracking import *
 
 def main():
     args = get_args(    ['exp', 'exp', 'Select experiment by four-letter ID'],
@@ -16,25 +16,14 @@ def main():
                         SILENT=True)
     profile = get_profile(args.exp, args.user, script=get_scriptname(__file__))
     folders = profile.get_folders()
-    raw = folders['raw']
-    videos = folders['videos']
 
-    ### go through SESSIONS
+    ### go through video sessions
     for each_session in get_session_list(profile.Nvids(), args.sfrom, args.sto, args.snot, args.sonly):
-        ### get timestamp and all files from session folder
-        allfiles, dtstamp, timestr = get_files(raw, each_session, videos)
 
-        ### load raw data
-        raw_data, data_units = get_data(allfiles['data'])
-
-        ### analyze frameskips
-        skips, bskips, maxskip, max_skip_arg = get_frame_skips(raw_data, println=True)
-
-        ### detect arena geometry
-        arena = get_arena_geometry()
-
-        ### detect food spots
-        food_spots = get_food_spots()
+        ### load video session data and metadata
+        session_data = RawData(each_session, folders)
+        session_data.define(columns=['datetime', 'elapsed_time', 'frame_dt', 'body_x', 'body_y', 'angle', 'major', 'minor'], units=['Datetime', 's', 's', 'px', 'px', 'rad', 'px', 'px'])
+        session_data.analyze_frameskips(dt='frame_dt')
 
         ### translate to start position
 
