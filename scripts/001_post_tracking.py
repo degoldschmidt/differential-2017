@@ -21,9 +21,13 @@ def main():
     for each_session in get_session_list(profile.Nvids(), args.sfrom, args.sto, args.snot, args.sonly):
 
         ### load video session data and metadata
-        session_data = RawData(each_session, folders)
+        session_data = RawData(args.exp, each_session, folders)
         session_data.define(columns=['datetime', 'elapsed_time', 'frame_dt', 'body_x', 'body_y', 'angle', 'major', 'minor'], units=['Datetime', 's', 's', 'px', 'px', 'rad', 'px', 'px'])
         session_data.analyze_frameskips(dt='frame_dt')
+        session_data.set_scale('diameter', 49.75, unit='mm')
+
+        for each in ["TopLeft", "Topright", "bottomLeft", "bottomright"]:
+            print("scale: ", session_data.arenas.get(each).pxmm)
 
         ### translate to start position
 

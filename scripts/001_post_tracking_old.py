@@ -114,63 +114,7 @@ def get_geom(filename):
     print("done.")
     return [(data.loc[len(data.index)-1, 'X'+str(ix+1)], data.loc[len(data.index)-1, 'Y'+str(ix+1)], data.loc[len(data.index)-1, 'R'+str(ix+1)]) for ix in range(4)]
 
-"""
-Returns metadata from session folder (DATAIO)
-"""
-def get_meta(allfiles, dtstamp, conditions):
-    meta = {}
 
-    ### Arena geometry
-    geom_data = get_geom(allfiles['geometry'])
-
-    ### Food spots
-    food_data = get_food(allfiles['food'])
-    food_data = validate_food(food_data, geom_data)
-    food_dict = {}
-    labels = ['topleft', 'topright', 'bottomleft', 'bottomright']
-    for kx, each_arena in enumerate(food_data):
-        food_dict[labels[kx]] = {}
-        for ix, each_spot in enumerate(each_arena):
-            food_dict[labels[kx]][str(ix)] = {}
-            labs = ['x', 'y', 'substrate']
-            substrate = ['10% yeast', '20 mM sucrose']
-            for jx, each_pt in enumerate(each_spot):
-                if jx == 2:
-                    if int(each_pt) < 2:
-                        food_dict[labels[kx]][str(ix)][labs[jx]] = substrate[0]
-                    if int(each_pt) == 2:
-                        food_dict[labels[kx]][str(ix)][labs[jx]] = substrate[1]
-                else:
-                    food_dict[labels[kx]][str(ix)][labs[jx]] = float(each_pt)
-
-    meta['food_spots'] = food_dict
-    ###
-    dict_geom = {}
-    for index, each_arena in enumerate(geom_data):
-        dict_geom[labels[index]] = {}
-        labels2 = ['x', 'y', 'r']
-        for j, each_pt in enumerate(each_arena):
-            dict_geom[labels[index]][labels2[j]] = float(each_pt)
-    meta['arena_geom'] = dict_geom
-    dims = get_frame_dims(allfiles["video"])
-    meta['frame_height'] = dims[0]
-    meta['frame_width'] = dims[1]
-    meta['frame_channels'] = dims[2]
-    meta['session_start'] = get_session_start(allfiles["timestart"])
-    meta['video'] = os.path.basename(allfiles["video"])
-    meta['video_start'] = dtstamp
-    ### get conditions files
-    meta["files"] = flistdir(conditions)
-    meta["conditions"] =  [os.path.basename(each).split('.')[0] for each in meta["files"]]
-    meta["variables"] = []
-    for ix, each in enumerate(meta["files"]):
-        with open(each, "r") as f:
-            lines = f.readlines()
-            if len(lines) > 1:
-                meta["variables"].append(meta["conditions"][ix])
-            else:
-                meta[meta["conditions"][ix]] = lines[0]
-    return meta
 
 """
 Returns new spots (DATAIO)
