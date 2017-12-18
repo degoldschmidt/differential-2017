@@ -254,21 +254,7 @@ def get_sign(image, frame, x, y, major, orird):
 
 
 
-"""
-Plot figs along program flow (VISUAL)
-"""
-def plot_along(f, ax):
-    warnings.filterwarnings("ignore")
-    mng = plt.get_current_fig_manager()
-    ### works on Ubuntu??? >> did NOT working on windows
-# mng.resize(*mng.window.maxsize())
-    mng.window.state('zoomed') #works fine on Windows!
-    f.show()
-    try:
-        f.canvas.start_event_loop(0)
-    except tk.TclError:
-        pass
-    warnings.filterwarnings("default")
+
 
 """
 Plot figs overlay  (VISUAL)
@@ -352,14 +338,6 @@ def strfdelta(tdelta, fmt):
     d["S"] = '{:06.3f}'.format(seconds + tdelta.microseconds/1000000)
     t = DeltaTemplate(fmt)
     return t.substitute(**d)
-
-"""
-Returns translated data for given session start (PROCESSING)
-"""
-def translate_to(data, start, time=''):
-    mask = (data[time] > start)
-    data = data.loc[mask]
-    return data, data.index[0]
 
 """
 Validate food spots (DATAIO)

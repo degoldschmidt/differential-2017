@@ -4,7 +4,7 @@ from pytrack_analysis import Multibench
 from pytrack_analysis.cli import get_args
 from pytrack_analysis.dataio import RawData, get_session_list
 from pytrack_analysis.profile import get_profile, get_scriptname, show_profile
-from pytrack_analysis.posttracking import *
+from pytrack_analysis.posttracking import frameskips, mistracks
 
 def main():
     args = get_args(    ['exp', 'exp', 'Select experiment by four-letter ID'],
@@ -21,21 +21,19 @@ def main():
     for each_session in get_session_list(profile.Nvids(), args.sfrom, args.sto, args.snot, args.sonly):
 
         ### load video session data and metadata
-        session_data = RawData(args.exp, each_session, folders)
-        session_data.define(columns=['datetime', 'elapsed_time', 'frame_dt', 'body_x', 'body_y', 'angle', 'major', 'minor'], units=['Datetime', 's', 's', 'px', 'px', 'rad', 'px', 'px'])
-        session_data.analyze_frameskips(dt='frame_dt')
-        session_data.set_scale('diameter', 49.75, unit='mm')
-
-        for each in ["TopLeft", "Topright", "bottomLeft", "bottomright"]:
-            print("scale: ", session_data.arenas.get(each).pxmm)
-
-        ### translate to start position
-
-        ### translate trajectories ot arena center
+        colnames = ['datetime', 'elapsed_time', 'frame_dt', 'body_x',   'body_y',   'angle',    'major',    'minor']
+        colunits = ['Datetime', 's',            's',        'px',       'px',       'rad',      'px',       'px']
+        session_data = RawData(args.exp, each_session, folders, columns=colnames, units=colunits)
+        print(session_data.raw_data[3].head())
 
         ### scale trajectories to mm
+        session_data.set_scale('diameter', 49.75, unit='mm')
+
+        ### detect frameskips
+        frameskips(session_data, dt='frame_dt')
 
         ### detect mistracked frames
+        #detect_mistrack(session_data)
 
         ### detect jumps
 
