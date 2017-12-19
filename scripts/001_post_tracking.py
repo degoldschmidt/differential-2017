@@ -24,13 +24,14 @@ def main():
         colnames = ['datetime', 'elapsed_time', 'frame_dt', 'body_x',   'body_y',   'angle',    'major',    'minor']
         colunits = ['Datetime', 's',            's',        'px',       'px',       'rad',      'px',       'px']
         session_data = RawData(args.exp, each_session, folders, columns=colnames, units=colunits)
-        print(session_data.raw_data[3].head())
 
         ### scale trajectories to mm
-        session_data.set_scale('diameter', 49.75, unit='mm')
+        session_data.set_scale('fix_scale', 8.543, unit='mm')
 
         ### detect frameskips
         frameskips(session_data, dt='frame_dt')
+
+        ### PLOT trajectories HERE
 
         ### detect mistracked frames
         #detect_mistrack(session_data)
@@ -43,20 +44,6 @@ def main():
 
         ### save fly data and metadata files
 
-        """
-        #f, ax = plot_overlay(allfiles['video'], arenas=geom_data, spots=food_data)
-        #plot_along(f, ax)
-
-        ### getting metadata
-        meta = get_meta(allfiles, dtstamp, manual)
-        meta['datadir'] = session_folder.split('/')[-2:]
-        meta['experiment'] = EXP_ID
-        meta['num_frames'] = get_num_frames(raw_data)
-        for each_condition in meta['variables']:
-            for each_file in meta["files"]:
-                if each_condition in each_file:
-                    conditions = pd.read_csv(each_file, sep='\t', index_col='ix')
-        """
         print()
 
 if __name__ == '__main__':
