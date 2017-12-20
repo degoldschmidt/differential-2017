@@ -1,10 +1,12 @@
 import os
+import numpy as np
 
 from pytrack_analysis import Multibench
 from pytrack_analysis.cli import get_args
 from pytrack_analysis.dataio import RawData, get_session_list
 from pytrack_analysis.profile import get_profile, get_scriptname, show_profile
 from pytrack_analysis.posttracking import frameskips, mistracks
+from pytrack_analysis.viz import plot_along, plot_fly, plot_overlay, plot_ts
 
 def main():
     args = get_args(    ['exp', 'exp', 'Select experiment by four-letter ID'],
@@ -32,6 +34,20 @@ def main():
         frameskips(session_data, dt='frame_dt')
 
         ### PLOT trajectories HERE
+        #f2, ax2 = plot_overlay(session_data.raw_data, 37597, x='body_x', y='body_y', arena=session_data.arenas, scale=8.543, trace=40, video=session_data.video_file)
+        #plot_along(f2, ax2)
+        #f1, ax1 = plot_fly(session_data.raw_data[0], x='body_x', y='body_y')
+        #plot_along(f1, ax1)
+        for i in range(4):
+            f, ax = plot_ts(session_data.raw_data[i], x='frame', y=['frame_dt', 'angle', 'major', 'minor'], units=['s', 'rad', 'mm', 'mm'])
+            plot_along(f, ax)
+        mistracks(session_data, x='body_x', y='body_y', major='major', thresholds=(4, 5))
+        f2, ax2 = plot_overlay(session_data.raw_data, session_data.first_frame+108000, x='body_x', y='body_y', arena=session_data.arenas, scale=8.543, trace=108000, video=session_data.video_file)
+        plot_along(f2, ax2)
+        for i in range(4):
+            f, ax = plot_ts(session_data.raw_data[i], x='frame', y=['frame_dt', 'angle', 'major', 'minor'], units=['s', 'rad', 'mm', 'mm'])
+            plot_along(f, ax)
+
 
         ### detect mistracked frames
         #detect_mistrack(session_data)
