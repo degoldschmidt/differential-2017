@@ -31,7 +31,7 @@ def main():
         session_data.set_scale('fix_scale', 8.543, unit='mm')
         ### detect frameskips
         frameskips(session_data, dt='frame_dt')
-        for i_arena, each_df in enumerate(session_data.raw_data[:1]):
+        for i_arena, each_df in enumerate(session_data.raw_data):
             ### compute frame-to-frame displacements
             each_df['displacement'] = get_displacements(each_df, x='body_x', y='body_y')
             ### detect mistracked frames
@@ -50,8 +50,9 @@ def main():
             each_df['flip'] = flip
             each_df['headpx'] = headpx
             each_df['tailpx'] = tailpx
-            outfile = os.path.join(folders['processed'],'post_tracking','001.csv')
-            print(outfile)
+            out_id = 4 * (each_session-1) + i_arena + 1
+            outfile = os.path.join(folders['processed'],'post_tracking','{}_{:03d}.csv'.format(args.exp, out_id))
+            print("Saving data to", outfile)
             each_df.to_csv(outfile, index_label='frame')
 
         if args.plot:
