@@ -28,7 +28,8 @@ def main():
         colunits = ['Datetime', 's',            's',        'px',       'px',       'rad',      'px',       'px']
         session_data = RawData(args.exp, each_session, folders, columns=colnames, units=colunits)
         ### scale trajectories to mm
-        session_data.set_scale('fix_scale', 8.543, unit='mm')
+        scale = 8.543
+        session_data.set_scale('fix_scale', scale, unit='mm')
         ### detect frameskips
         frameskips(session_data, dt='frame_dt')
         for i_arena, each_df in enumerate(session_data.raw_data):
@@ -38,10 +39,10 @@ def main():
             each_df = mistracks(each_df, i_arena, dr='displacement', major='major', thresholds=(4, 5))
             ### compute head and tail positions
             head_tails = get_head_tail(each_df, x='body_x', y='body_y', angle='angle', major='major')
-            each_df['head_x'] = head_tails[0]
-            each_df['head_y'] = head_tails[1]
-            each_df['tail_x'] = head_tails[2]
-            each_df['tail_y'] = head_tails[3]
+            each_df['head_x'] = scale * head_tails[0] + session_data.arenas[i_arena].x
+            each_df['head_y'] = scale * head_tails[1] + session_data.arenas[i_arena].y
+            each_df['tail_x'] = scale * head_tails[2] + session_data.arenas[i_arena].x
+            each_df['tail_y'] = scale * head_tails[3] + session_data.arenas[i_arena].y
             ### detect head flips
             flip, headpx, tailpx = get_pixel_flip(each_df,
                                                 hx='head_x', hy='head_y', tx='tail_x', ty='tail_y',
