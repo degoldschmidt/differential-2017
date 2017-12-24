@@ -51,6 +51,7 @@ def main():
             each_df['flip'] = flip
             each_df['headpx'] = headpx
             each_df['tailpx'] = tailpx
+            print(headpx, tailpx)
             out_id = 4 * (each_session-1) + i_arena + 1
             outfile = os.path.join(folders['processed'],'post_tracking','{}_{:03d}.csv'.format(args.exp, out_id))
             print("Saving data to", outfile)
