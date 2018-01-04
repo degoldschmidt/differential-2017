@@ -1,13 +1,14 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from pytrack_analysis import Multibench
 from pytrack_analysis.cli import get_args
 from pytrack_analysis.dataio import RawData, get_session_list
 from pytrack_analysis.profile import get_profile, get_scriptname, show_profile
 from pytrack_analysis.posttracking import frameskips, get_displacements, get_head_tail, mistracks, get_pixel_flip
-from pytrack_analysis.viz import plot_along, plot_fly, plot_overlay, plot_ts
+from pytrack_analysis.viz import plot_along, plot_fly, plot_intervals, plot_overlay, plot_ts
 
 def main():
     var_args =  [['exp', 'exp', 'Select experiment by four-letter ID'],
@@ -39,16 +40,19 @@ def main():
         ### detect frameskips
         frameskips(session_data, dt='frame_dt')
         for i_arena, each_df in enumerate(session_data.raw_data):
+            arena = session_data.arenas[i_arena]
             ### compute frame-to-frame displacements
             each_df['displacement'] = get_displacements(each_df, x='body_x', y='body_y')
             ### detect mistracked frames
             each_df = mistracks(each_df, i_arena, dr='displacement', major='major', thresholds=(4, 5))
             ### compute head and tail positions
             head_tails = get_head_tail(each_df, x='body_x', y='body_y', angle='angle', major='major')
-            each_df['head_x'] = scale * head_tails[0] + session_data.arenas[i_arena].x
-            each_df['head_y'] = scale * head_tails[1] + session_data.arenas[i_arena].y
-            each_df['tail_x'] = scale * head_tails[2] + session_data.arenas[i_arena].x
-            each_df['tail_y'] = scale * head_tails[3] + session_data.arenas[i_arena].y
+            each_df['head_x'] = head_tails['head_x']
+            each_df['head_y'] = head_tails['head_y']
+            each_df['head_px'] = scale * head_tails['head_x'] + arena.x
+            each_df['head_py'] = scale * head_tails['head_y'] + arena.y
+            each_df['tail_px'] = scale * head_tails['tail_x'] + arena.x
+            each_df['tail_py'] = scale * head_tails['tail_y'] + arena.y
             ### detect head flips
             file_id = 4 * (each_session-1) + i_arena + 1
             _file = os.path.join(folders['processed'],'post_tracking','{}_{:03d}.csv'.format(args.exp, file_id))
@@ -59,21 +63,30 @@ def main():
                 each_df['headpx'] = df['headpx']
                 each_df['tailpx'] = df['tailpx']
             else:
-                flip, headpx, tailpx = get_pixel_flip(each_df, hx='head_x', hy='head_y', tx='tail_x', ty='tail_y', video=session_data.video_file, start=session_data.first_frame)
+                flip, headpx, tailpx = get_pixel_flip(each_df, hx='head_px', hy='head_py', tx='tail_px', ty='tail_py', video=session_data.video_file, start=session_data.first_frame)
                 each_df['flip'] = flip
                 each_df['headpx'] = headpx
                 each_df['tailpx'] = tailpx
                 print("Saving data to", _file)
                 each_df.to_csv(_file, index_label='frame')
-
+        session_data.flip_y()
 
 
         if args.plot:
-            #f, ax = plot_fly(session_data.raw_data[0], x='body_x', y='body_y', hx='head_x', hy='head_y')
-            #plot_along(f, ax)
+            """
+            f, ax = plot_overlay(session_data.raw_data, session_data.first_frame, x='body_x', y='body_y', hx='head_x', hy='head_y', arenas=session_data.arenas, scale=scale, video=session_data.video_file)
+            plot_along(f, ax)
+            """
             for i in range(4):
-                f, ax = plot_ts(session_data.raw_data[i], x='frame', y=['frame_dt', 'angle', 'major', 'minor', 'displacement', 'flip'], units=['s', 'rad', 'mm', 'mm', 'mm/frame', ''])
-                plot_along(f, ax)
+                arena = session_data.arenas[i]
+                nintervals = 12
+                f, axes = plot_intervals(nintervals, session_data.raw_data[i], x='body_x', y='body_y', hx='head_x', hy='head_y', arena=arena, spots=arena.spots)
+                file_id = 4 * (each_session-1) + i + 1
+                _file = os.path.join(folders['out'], '{}_{:03d}_intervals.png'.format(args.exp, file_id))
+                f.savefig(_file, dpi=300)
+                #f, ax = plot_ts(session_data.raw_data[i], x='frame', y=['frame_dt', 'angle', 'major', 'minor', 'displacement', 'flip'], units=['s', 'rad', 'mm', 'mm', 'mm/frame', ''])
+                #plot_along(f, ax)
+
 
         ### detect jumps
 
