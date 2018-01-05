@@ -80,10 +80,13 @@ def main():
             for i in range(4):
                 arena = session_data.arenas[i]
                 nintervals = 60
-                f, axes = plot_intervals(nintervals, session_data.raw_data[i], x='body_x', y='body_y', hx='head_x', hy='head_y', time='elapsed_time', arena=arena, spots=arena.spots)
+                f, axes = plot_intervals(nintervals, session_data.raw_data[i], x='body_x', y='body_y', hx='head_x', hy='head_y', flip='flip', time='elapsed_time', arena=arena, spots=arena.spots)
                 file_id = 4 * (each_session-1) + i + 1
                 _file = os.path.join(folders['out'], '{}_{:03d}_intervals.pdf'.format(args.exp, file_id))
+                plt.tight_layout()
                 f.savefig(_file, dpi=600)
+                plt.close(f)
+            print(plt.get_fignums())
                 #f, ax = plot_ts(session_data.raw_data[i], x='frame', y=['frame_dt', 'angle', 'major', 'minor', 'displacement', 'flip'], units=['s', 'rad', 'mm', 'mm', 'mm/frame', ''])
                 #plot_along(f, ax)
 
