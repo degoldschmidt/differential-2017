@@ -49,6 +49,8 @@ def main():
             head_tails = get_head_tail(each_df, x='body_x', y='body_y', angle='angle', major='major')
             each_df['head_x'] = head_tails['head_x']
             each_df['head_y'] = head_tails['head_y']
+            each_df['tail_x'] = head_tails['tail_x']
+            each_df['tail_y'] = head_tails['tail_y']
             each_df['head_px'] = scale * head_tails['head_x'] + arena.x
             each_df['head_py'] = scale * head_tails['head_y'] + arena.y
             each_df['tail_px'] = scale * head_tails['tail_x'] + arena.x
