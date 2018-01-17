@@ -36,6 +36,6 @@ for session_id in range(raw_data.nvids):
         each_df['flip'] = flips[i_arena]
         each_df['headpx'] = headpxs[i_arena]
         each_df['tailpx'] = tailpxs[i_arena]
-        new_df = each_df.loc[:, ['frame', 'flip', 'headpx', 'tailpx']]
+        new_df = each_df.loc[:, ['flip', 'headpx', 'tailpx']]
         print("Saving data to", _file)
         new_df.to_csv(_file, index_label='frame')
