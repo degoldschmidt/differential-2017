@@ -74,7 +74,7 @@ def main():
     folders = profile.get_folders()
     colnames = ['datetime', 'elapsed_time', 'frame_dt', 'body_x',   'body_y',   'angle',    'major',    'minor']
     colunits = ['Datetime', 's',            's',        'px',       'px',       'rad',      'px',       'px']
-    raw_data = RawData(experiment, folders, columns=colnames, units=colunits, noVideo=True)
+    raw_data = RawData(experiment, folders, columns=colnames, units=colunits, noVideo=False)
     ### go through all session
     for i_session in range(raw_data.nvids):
         raw_data.get_session(i_session)
@@ -105,6 +105,30 @@ def main():
             _file = os.path.join(folders['processed'], 'post_tracking','{}_{:03d}.csv'.format(experiment, file_id))
             out_df = each_df[['datetime', 'elapsed_time', 'frame_dt', 'body_x', 'body_y', 'head_x', 'head_y', 'tail_x', 'tail_y', 'angle', 'major', 'minor', 'flipped']]
             out_df.to_csv(_file, index_label='frame')
+            meta_dict = {}
+            arena = raw_data.arenas[i_arena]
+
+            #### meta_dict save
+            import yaml
+            import io
+            with open(os.path.join(folders['manual'],'conditions.yaml'), 'r') as stream:
+                try:
+                    conds = yaml.load(stream)
+                except yaml.YAMLError as exc:
+                    print(exc)
+            meta_dict['arena'] = {'x': float(arena.x), 'y': float(arena.y), 'layout': conds['arena_layout'], 'name': arena.name, 'outer': float(arena.outer), 'radius': float(arena.r), 'scale': arena.pxmm}
+            meta_dict['condition'] = raw_data.condition[i_arena]
+            meta_dict['datafile'] = _file
+            meta_dict['datetime'] = raw_data.timestamp
+            spots = arena.spots
+            meta_dict['food_spots'] = [{'x': float(each.rx), 'y': float(each.ry), 'r': 1.5, 'substr': each.substrate} for each in spots]
+            meta_dict['fly'] = {'genotype': conds['genotype'], 'mating': conds['mating'], 'metabolic': raw_data.condition[i_arena], 'n_per_arena': conds['num_flies'], 'sex': conds['sex']}
+            meta_dict['setup'] = {'light': conds['light'], 'humidity': conds['humidity'], 'name': conds['setup'], 'room': 'behavior room', 'temperature': '25C'}
+            meta_dict['video'] = {'dir': folders['videos'], 'file': raw_data.video_file, 'first_frame': int(raw_data.first_frame), 'last_frame': int(raw_data.last_frame), 'nframes': len(each_df.index), 'start_time': raw_data.starttime}
+            _yaml = _file[:-4]+'.yaml'
+            with io.open(_yaml, 'w', encoding='utf8') as f:
+                yaml.dump(meta_dict, f, default_flow_style=False, allow_unicode=True)
+
 
 if __name__ == '__main__':
     # runs as benchmark test
