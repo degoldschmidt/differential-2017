@@ -21,7 +21,7 @@ colunits = ['Datetime', 's',            's',        'px',       'px',       'rad
 raw_data = RawData(experiment, folders, columns=colnames, units=colunits, noVideo=False)
 
 ### go through sessions
-for session_id in range(raw_data.nvids):
+for session_id in range(66,67):
     raw_data.get_session(session_id)
     load_from_file = False
     ### for each arena
