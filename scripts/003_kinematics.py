@@ -6,6 +6,7 @@ import pytrack_analysis.preprocessing as prp
 from pytrack_analysis import Kinematics
 #from pytrack_analysis import Statistics
 from pytrack_analysis import Multibench
+from pytrack_analysis.cli import colorprint, flprint, prn
 import logging
 
 ### plotting
