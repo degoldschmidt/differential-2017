@@ -79,6 +79,7 @@ def main():
     for i_session in range(raw_data.nvids):
         raw_data.get_session(i_session)
         raw_data.center()
+        mistrk_list = []
         ### for each arena
         for i_arena, each_df in enumerate(raw_data.get_data()):
             ### compute head and tail positions
@@ -87,7 +88,8 @@ def main():
             arena = raw_data.arenas[i_arena]
             each_df['displacement'], each_df['dx'], each_df['dy'], each_df['mov_angle'], each_df['align'], each_df['acc'] = get_displacements(each_df, x='body_x', y='body_y', angle='angle')
             ### detect mistracked frames
-            each_df = mistracks(each_df, i_arena, dr='displacement', major='major', thresholds=(4*8.543, 5*8.543), keep=True)
+            each_df, mistr = mistracks(each_df, i_arena, dr='displacement', major='major', thresholds=(4*8.543, 5*8.543))
+            mistrk_list.append(len(mistr))
 
             file_id = 4 * (i_session) + i_arena
             _file = os.path.join(folders['processed'],'pixeldiff','{}_{:03d}.csv'.format(experiment, file_id))
@@ -96,9 +98,12 @@ def main():
             each_df['headpx'], each_df['tailpx'] = df['headpx'], df['tailpx']
             each_df = get_corrected_flips(each_df)
         ### scale trajectories to mm
+        #print(raw_data.get_data(0).head(3))
         scale = 8.543
         raw_data.set_scale('fix_scale', scale, unit='mm')
         raw_data.flip_y()
+        print(mistrk_list)
+        #print(raw_data.get_data(0).head(3))
         #plot_traj(raw_data, scale, time=(raw_data.first_frame, raw_data.last_frame), only='tail')
         for i_arena, each_df in enumerate(raw_data.get_data()):
             file_id = 4 * i_session + i_arena
@@ -120,6 +125,7 @@ def main():
             meta_dict['condition'] = raw_data.condition[i_arena]
             meta_dict['datafile'] = _file
             meta_dict['datetime'] = raw_data.timestamp
+            meta_dict['flags'] = {'mistracked_frames': mistrk_list[i_arena]}
             spots = arena.spots
             meta_dict['food_spots'] = [{'x': float(each.rx), 'y': float(each.ry), 'r': 1.5, 'substr': each.substrate} for each in spots]
             meta_dict['fly'] = {'genotype': conds['genotype'], 'mating': conds['mating'], 'metabolic': raw_data.condition[i_arena], 'n_per_arena': conds['num_flies'], 'sex': conds['sex']}

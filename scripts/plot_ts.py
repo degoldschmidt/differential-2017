@@ -79,9 +79,11 @@ def ts_plot(_data, _file):
         for j, each in enumerate(matches):
             ydata = _data[each]
             if y[i] == 'dpatch':
-                ax.plot(ydata, c=ycolors[i][j], label=each, lw=.5, alpha=0.5)
+                ax.plot(ydata, c=ycolors[i][j], label=each, lw=1, alpha=0.9)
             else:
                 ax.plot(ydata, c=ycolors[i][j], label=each, lw=.5)
+                if len(matches) > 1:
+                    ax.legend(fontsize=6)
         ax.set_ylabel(ylabels[i], labelpad=20, rotation_mode='anchor', rotation=0, fontsize=8)
         ax.set_xlim([_data.index[0], _data.index[-1]])
         if y[i] == 'dpatch':
@@ -91,6 +93,7 @@ def ts_plot(_data, _file):
     plt.tight_layout()
     plt.savefig(_file, dpi=600)
     plt.clf()
+    plt.close()
 
 def main():
     # filename of this script
@@ -107,7 +110,7 @@ def main():
         df['major'] = df_raw['major']
         df['minor'] = df_raw['minor']
         ts_plot(df, os.path.join(profile.out(),each.name+'_ts.pdf'))
-        traj_plot(df, os.path.join(profile.out(),each.name+'_traj.pdf'), arena=meta['arena'], )
+        #traj_plot(df, os.path.join(profile.out(),each.name+'_traj.pdf'), arena=meta['arena'], )
 
 if __name__ == '__main__':
     # runs as benchmark test
