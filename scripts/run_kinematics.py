@@ -40,14 +40,12 @@ def get_day(_int):
     """
     if _int >= 8 and _int < 11:
         return 8
-    elif _int >= 11 and _int < 14:
+    if _int >= 11 and _int < 14:
         return 11
-    elif _int >= 14 or _int < 17:
+    if _int >= 14 and _int < 17:
         return 14
-    elif _int >= 17 or _int < 20:
+    if _int >= 17:
         return 17
-    elif _int >= 20:
-        return 20
 
 def main():
     # filename of this script
