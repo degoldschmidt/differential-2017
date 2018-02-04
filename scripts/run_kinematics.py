@@ -50,11 +50,12 @@ def get_day(_int):
 def main():
     # filename of this script
     thisscript = os.path.basename(__file__).split('.')[0]
-    profile = get_profile('DIFF', 'degoldschmidt', script=thisscript)
+    experiment = 'DIFF'
+    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
     db = Experiment(profile.db()) # database from file
 
     ### GO THROUGH SESSIONS
-    statdict = {'session': [], 'day': [], 'daytime': [], 'condition': [], 'position': [], 'head_speed': [], 'body_speed': [], 'distance': [], 'abs_turn_rate': [], 'major': [], 'minor': []}
+    statdict = {'session': [], 'day': [], 'daytime': [], 'condition': [], 'position': [], 'head_speed': [], 'body_speed': [], 'distance': [], 'dcenter': [], 'abs_turn_rate': [], 'major': [], 'minor': [], 'mistracks': []}
     for each in db.sessions:
         df, meta = each.load(VERBOSE=False)
         kine = Kinematics(df, meta)
@@ -67,13 +68,17 @@ def main():
         statdict['head_speed'].append(outdf['smm_head_speed'].mean())
         statdict['body_speed'].append(outdf['smm_body_speed'].mean())
         statdict['distance'].append(np.cumsum(np.array(outdf['displacements']))[-1])
+        statdict['dcenter'].append(outdf['dcenter'].mean())
         statdict['abs_turn_rate'].append(np.abs(outdf['angular_speed']).mean())
         statdict['major'].append(df['major'].mean())
         statdict['minor'].append(df['minor'].mean())
+        statdict['mistracks'].append(meta['flags']['mistracked_frames'])
     statdf = pd.DataFrame(statdict)
-    statdf = statdf.reindex(columns=['session', 'day', 'daytime', 'condition', 'position', 'head_speed', 'body_speed', 'distance', 'abs_turn_rate', 'major', 'minor'])
+    statdf = statdf.reindex(columns=['session', 'day', 'daytime', 'condition', 'position', 'head_speed', 'body_speed', 'distance', 'dcenter', 'abs_turn_rate', 'major', 'minor', 'mistracks'])
     print(statdf)
     print(statdf.daytime.value_counts())
+    statfile = os.path.join(profile.out(), experiment+'_kinematics_stats.csv')
+    statdf.to_csv(statfile, index=False)
     ### delete objects
     del profile
 
