@@ -68,20 +68,24 @@ def main():
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
 
     ### Load data
-    _binsize = 0.2
-    which = 'sm_'
-    _bins = np.append(np.arange(0,25,_binsize),1000)
-    inhistdf = pd.read_csv(os.path.join(profile.out(), experiment+'_kinematics_ihist_{}{:1.0E}.csv'.format(which, _binsize)))
-    outhistdf = pd.read_csv(os.path.join(profile.out(), experiment+'_kinematics_ohist_{}{:1.0E}.csv'.format(which, _binsize)))
+    for each_binsize in [0.01, 0.05, 0.1, 0.2]:
+        for each_sm in ['sm_']:
+            _binsize = each_binsize
+            which = each_sm
+            _bins = np.append(np.arange(0,25,_binsize),1000)
+            _ifile = os.path.join(profile.out(), experiment+'_kinematics_ihist_{}{:1.0E}.csv'.format(which, _binsize))
+            _ofile = os.path.join(profile.out(), experiment+'_kinematics_ohist_{}{:1.0E}.csv'.format(which, _binsize))
+            inhistdf = pd.read_csv(_ifile)
+            outhistdf = pd.read_csv(_ofile)
 
-    out_hists = [] ##np.zeros((n_ses, len(_bins)-1))
-    in_hists = []
-    for each_col in inhistdf:
-        if not 'bin' in each_col:
-            out_hists.append(np.array(outhistdf[each_col]))
-            in_hists.append(np.array(inhistdf[each_col]))
+            out_hists = [] ##np.zeros((n_ses, len(_bins)-1))
+            in_hists = []
+            for each_col in inhistdf:
+                if not 'bin' in each_col:
+                    out_hists.append(np.array(outhistdf[each_col]))
+                    in_hists.append(np.array(inhistdf[each_col]))
+            plot_histograms(_bins, in_hists, out_hists, which, profile.out(), _binsize)
 
-    plot_histograms(_bins, in_hists, out_hists, which, profile.out(), _binsize)
     ### delete objects
     del profile
 
