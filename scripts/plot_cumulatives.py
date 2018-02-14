@@ -22,12 +22,12 @@ import tkinter as tk
 def plot_cumulatives(data, color=None, ax=None, title=None, tiky=None, maxy=None, reduce=None):
     maxx = 108000
     dmean = np.mean(np.array(data)[:maxx,:], axis=1)
-    dsem = np.std(np.array(data)[:maxx,:], axis=1)/np.sqrt(np.array(data).shape[0])
+    dsem = np.std(np.array(data)[:maxx,:], axis=1) #/np.sqrt(np.array(data).shape[0])
     for col in data.columns:
         ts = np.array(data.loc[:,col])[:maxx]
         ax.plot(ts/60, color='#8c8c8c', alpha=0.5, lw=0.5)
     ax.plot(dmean/60, color=color, alpha=0.9, lw=1)
-    ax.fill_between(np.arange(0,maxx), (dmean+dsem)/60, (dmean-dsem)/60, color=color, alpha=0.5, lw=0)
+    ax.fill_between(np.arange(0,maxx), (dmean-dsem)/60, (dmean+dsem)/60, color=color, alpha=0.5, lw=0)
     ax.set_title(title)
     ax.set_xlim([-0.01*maxx,maxx])
     ax.set_xticks([0, maxx/2, maxx])
@@ -78,7 +78,7 @@ def main():
     ### Plotting
     colors = ["#98c37e", "#5788e7", "#D66667", "#2b2b2b"]
     maxy = {'Yeast': 2500/60, 'Sucrose': 1000/60}
-    tiky = {'Yeast': 500, 'Sucrose': 200}
+    tiky = {'Yeast': 10, 'Sucrose': 5}
     for each_substr in ['Yeast', 'Sucrose']:
         f, axes = plt.subplots(1, 4, figsize=(8,3), dpi=400, sharey=True)
         for i, each_cond in enumerate(conds):
