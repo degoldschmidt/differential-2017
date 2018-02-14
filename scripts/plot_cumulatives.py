@@ -21,13 +21,16 @@ import tkinter as tk
 
 def plot_cumulatives(data, color=None, ax=None, title=None, tiky=None, maxy=None, reduce=None):
     maxx = 108000
-    dmean = np.mean(np.array(data)[:maxx,:], axis=1)
-    dsem = np.std(np.array(data)[:maxx,:], axis=1) #/np.sqrt(np.array(data).shape[0])
+    N = np.array(data).shape[0]
+    print(N)
+    dmean = np.mean(np.array(data), axis=1)
+    dsem = np.std(np.array(data), axis=1)/np.sqrt(N)
+    print(dmean)
     for col in data.columns:
-        ts = np.array(data.loc[:,col])[:maxx]
-        ax.plot(ts/60, color='#8c8c8c', alpha=0.5, lw=0.5)
-    ax.plot(dmean/60, color=color, alpha=0.9, lw=1)
-    ax.fill_between(np.arange(0,maxx), (dmean-dsem)/60, (dmean+dsem)/60, color=color, alpha=0.5, lw=0)
+        ts = np.array(data.loc[:,col])
+        ax.plot(np.arange(0,maxx), ts/60, color='#8c8c8c', alpha=0.5, lw=0.5)
+    ax.plot(np.arange(0,maxx), dmean/60, color=color, alpha=0.9, lw=0.75)
+    ax.fill_between(np.arange(0,maxx), (dmean-dsem)/60, (dmean+dsem)/60, color=color, alpha=0.2, lw=0)
     ax.set_title(title)
     ax.set_xlim([-0.01*maxx,maxx])
     ax.set_xticks([0, maxx/2, maxx])
@@ -69,15 +72,15 @@ def main():
             df['Ydur'], df['Sdur'] = df['frame_dt'], df['frame_dt']
             df.loc[df['etho'] != 4, 'Ydur'] = 0
             df.loc[df['etho'] != 5, 'Sdur'] = 0
-            EthoTotals['Yeast'][meta['condition']][each.name] = np.cumsum(df['Ydur'])
-            EthoTotals['Sucrose'][meta['condition']][each.name] = np.cumsum(df['Sdur'])
+            EthoTotals['Yeast'][meta['condition']][each.name] = np.cumsum(np.array(df['Ydur']))[:108000]
+            EthoTotals['Sucrose'][meta['condition']][each.name] = np.cumsum(np.array(df['Sdur']))[:108000]
             print(each.name)
         except FileNotFoundError:
             pass
 
     ### Plotting
     colors = ["#98c37e", "#5788e7", "#D66667", "#2b2b2b"]
-    maxy = {'Yeast': 2500/60, 'Sucrose': 1000/60}
+    maxy = {'Yeast': 50, 'Sucrose': 15}
     tiky = {'Yeast': 10, 'Sucrose': 5}
     for each_substr in ['Yeast', 'Sucrose']:
         f, axes = plt.subplots(1, 4, figsize=(8,3), dpi=400, sharey=True)
