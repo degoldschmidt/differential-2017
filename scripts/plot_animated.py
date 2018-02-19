@@ -40,7 +40,7 @@ def updatefig(i, *image):
     image[0].set_array(image[1][i])
     return image[0],
 
-def animate_time_series_with_video(data, time=None, cols=None, video=None, figsize=(8,6), interval=None):
+def animate_time_series_with_video(data, time=None, cols=None, video=None, figsize=(8,6), interval=None, playback=1):
     ts_colors = [   '#8dd3c7',
                     '#fcfc2f',
                     '#bebada',
