@@ -59,7 +59,7 @@ def main():
         nancheck = df['sm_head_speed'].isnull().values.any()
         if not (meta['flags']['mistracked_frames'] > 30 or meta['condition'] =='NA' or nancheck or len(meta['food_spots']) == 0):
             classify = Classifier(df, meta)
-            df['etho'], df['visit'], df['encounter'] = classify.run()
+            df['etho'], df['visit'], df['encounter'], df['encounter_index'] = classify.run()
             outdf = df.loc[:, ['time', 'frame_dt', 'etho', 'visit', 'encounter']]
             outfile = os.path.join(outfolder, each.name+'_'+classify.name+'.csv')
             outdf.to_csv(outfile, index_label='frame')
