@@ -80,7 +80,7 @@ def main():
 
     ### Plotting
     colors = ["#98c37e", "#5788e7", "#D66667", "#2b2b2b"]
-    maxy = {'Yeast': 50, 'Sucrose': 15}
+    maxy = {'Yeast': 50, 'Sucrose': 25}
     tiky = {'Yeast': 10, 'Sucrose': 5}
     for each_substr in ['Yeast', 'Sucrose']:
         f, axes = plt.subplots(1, 4, figsize=(8,3), dpi=400, sharey=True)
