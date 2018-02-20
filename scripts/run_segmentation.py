@@ -2,15 +2,9 @@ import os
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
 import pytrack_analysis.preprocessing as prp
-from pytrack_analysis import Classifier
+from pytrack_analysis import Segments
 from pytrack_analysis import Multibench
-from pytrack_analysis.viz import set_font, swarmbox
 
-import warnings
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import pandas as pd
 pd.set_option('display.max_columns', 30)
@@ -38,20 +32,28 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
     stats = []
-    _in, _out = 'kinematics', 'classifier'
+    _in, _out = 'classifier', 'segments'
     infolder = os.path.join(profile.out(), _in)
     outfolder = os.path.join(profile.out(), _out)
 
     ### GO THROUGH SESSIONS
     for i_ses, each in enumerate(sessions):
-        csv_file = os.path.join(infolder,  each.name+'_'+_in+'.csv')
-        df = pd.read_csv(csv_file, index_col='frame')
-        meta = each.load_meta(VERBOSE=False)
-        ## total micromoves
-        nancheck = df['sm_head_speed'].isnull().values.any()
-        if not (meta['flags']['mistracked_frames'] > 30 or meta['condition'] =='NA' or nancheck or len(meta['food_spots']) == 0):
-            classify = Classifier(df, meta)
-            classify.run(save_as=outfolder)
+        ### Loading data
+        try:
+            csv_file = os.path.join(infolder,  each.name+'_' + _in +'.csv')
+            df = pd.read_csv(csv_file, index_col='frame')
+            meta = each.load_meta(VERBOSE=False)
+            segm = Segments(df, meta)
+            listdfs = segm.run(save_as=outfolder, ret=True)
+        except FileNotFoundError:
+            print(csv_file+ ' not found!')
+    print(listdfs[0].head(10))
+    print()
+    print(listdfs[1].head(10))
+    print()
+    print(listdfs[2].head(10))
+    print()
+    print(listdfs[3].head(10))
     ### delete objects
     del profile
 
