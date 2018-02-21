@@ -44,16 +44,16 @@ def main():
             df = pd.read_csv(csv_file, index_col='frame')
             meta = each.load_meta(VERBOSE=False)
             segm = Segments(df, meta)
-            listdfs = segm.run(save_as=outfolder, ret=True)
+            dfs = segm.run(save_as=outfolder, ret=True)
         except FileNotFoundError:
             print(csv_file+ ' not found!')
-    print(listdfs[0].head(10))
+    print(dfs['etho'].head(10))
     print()
-    print(listdfs[1].head(10))
+    print(dfs['visit'].head(10))
     print()
-    print(listdfs[2].head(10))
+    print(dfs['encounter'].head(10))
     print()
-    print(listdfs[3].head(10))
+    print(dfs['encounter_index'].head(10))
     ### delete objects
     del profile
 
