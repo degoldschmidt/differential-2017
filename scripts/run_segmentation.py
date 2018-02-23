@@ -47,13 +47,10 @@ def main():
             dfs = segm.run(save_as=outfolder, ret=True)
         except FileNotFoundError:
             print(csv_file+ ' not found!')
-    print(dfs['etho'].head(10))
-    print()
-    print(dfs['visit'].head(10))
-    print()
-    print(dfs['encounter'].head(10))
-    print()
-    print(dfs['encounter_index'].head(10))
+    for each in dfs.keys():
+        print(each)
+        print(dfs[each].head(10))
+        print()
     ### delete objects
     del profile
 
