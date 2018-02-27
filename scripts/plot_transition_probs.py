@@ -9,7 +9,8 @@ import pandas as pd
 import os
 from scipy.stats import ranksums
 
-OVERWRITE = True
+OVERWRITE = False
+onlyAA = False
 
 def main():
     """
@@ -24,24 +25,26 @@ def main():
     n_ses = len(sessions)
 
     conds = ["SAA", "AA", "S", "O"]
+    substrates = ['yeast', 'sucrose']
     ### inputs
     _in = ['kinematics', 'classifier']
     infolder = [os.path.join(profile.out(), each) for each in _in]
     ### outputs
     _out = 'plots'
     outfolder = os.path.join(profile.out(), _out)
-    outdf = {'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': []}
-    _outfile = 'probability_stop'
+    outdf = {   'session': [], 'condition': [], 'substrate': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'total': []}
+    _outfile = 'transition_probability'
     data_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(data_file) and not OVERWRITE:
         print('Found data hook')
         outdf = pd.read_csv(data_file, index_col='id')
     else:
         print('Compute data')
-        for i_ses, each in enumerate(sessions[:1]):
+        for i_ses, each in enumerate(sessions):
             ### Loading data
             try:
                 ### Loading data
+                print(each.name)
                 meta = each.load_meta()
                 csv_file = [os.path.join(infolder[i_in], '{}_{}.csv'.format(each.name, each_in)) for i_in, each_in in enumerate(_in)]
                 dfs = [pd.read_csv(_file, index_col='frame') for _file in csv_file]
@@ -51,53 +54,110 @@ def main():
                 segmfolder = os.path.join(profile.out(), 'segments')
                 csv_file = [os.path.join(segmfolder, '{}_{}_{}.csv'.format(each.name, 'segments', segm)) for segm in segment_cols]
                 dfs = [pd.read_csv(_file, index_col='segment') for _file in csv_file]
-                per_segment_df = pd.concat(dfs, axis=1)
+                per_segment_df = dfs[0]
+                per_segment_df['spot'] = dfs[1]['state']
 
-                print(per_frame_df.head(5))
-                print(per_segment_df.head(5))
-                """
-                only_yeast_encounters = segmdf.query("state == 1")
-                counter = 0
-                for index, row in only_yeast_encounters.iterrows():
-                    pos = int(row['position'])
-                    end = int(row['position']+row['arraylen'])
-                    ethovec = np.array(ethodf['etho'])[pos:end]
-                    has_yeast_micromov = np.any(ethovec == 4)
-                    #print("Segment {:3d} at position {:6d} (len: {:4d}) has yeast micromovements: {}".format(int(index), pos, end-pos, has_yeast_micromov))
-                    if has_yeast_micromov:
-                        counter += 1
-                ratio = counter/len(only_yeast_encounters.index)
-                #print(ratio)
-                outdf['session'].append(each.name)
-                outdf['condition'].append(meta['condition'])
-                outdf['ratio'].append(ratio)
-                """
+                only_food_visits = per_segment_df.query('state > 0')
+                states = np.array(only_food_visits['state'])
+                spots = np.array(only_food_visits['spot'])
+                pos = np.array(only_food_visits['position'])
+                lens = np.array(only_food_visits['arraylen'])
+                visit_transitions = np.diff(states) + 2*states[:-1]
+
+                #print(only_food_visits[['state', 'spot']])
+                for j, substr in enumerate(substrates):
+                    transitions = np.where(visit_transitions == 2*(j+1))[0]
+                    print(2*(j+1), len(transitions))
+                    Ntrans = len(transitions)
+                    same, near, far = 0, 0, 0
+                    for index in transitions:
+                        if spots[index]==spots[index+1]:
+                            dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
+                            if np.any(dist_to_pre>16):
+                                far += 1
+                            else:
+                                same += 1
+                        else:
+                            dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
+                            if np.any(dist_to_pre>16):
+                                far += 1
+                            else:
+                                near += 1
+                    print(substr, ':', same, near, far)
+                    if same+near+far != Ntrans: print('we have a problem')
+                    if Ntrans > 0:
+                        same /= Ntrans
+                        near /= Ntrans
+                        far /= Ntrans
+                    #{'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': []}
+                    outdf['session'].append(each.name)
+                    outdf['condition'].append(meta['condition'])
+                    outdf['substrate'].append(substr)
+                    outdf['same_patch'].append(same)
+                    outdf['near_patch'].append(near)
+                    outdf['far_patch'].append(far)
+                    outdf['total'].append(Ntrans)
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
-        """
+
         outdf = pd.DataFrame(outdf)
+        print("Saving to {}".format(data_file))
         outdf.to_csv(data_file, index_label='id')
     print(outdf)
-        """
+    if onlyAA:
+        outdf = outdf.query('condition == "SAA" or condition == "S"')
+        outdf['condition'] = outdf['condition'].replace({'SAA':'+'})
+        outdf['condition'] = outdf['condition'].replace({'S':'-'})
+        newfile = os.path.join(outfolder, "{}_aa.csv".format(_outfile))
+        outdf.to_csv(newfile, index_label='id')
 
-    """
     #### Plotting
-    f, ax = plt.subplots(figsize=(3,2.5))
-
     # swarmbox
-    ax = swarmbox(x='condition', y='ratio', data=outdf, palette={'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}, compare=[('SAA', ('AA', 'S', 'O'))])
+    for j, each in enumerate(substrates):
+        if onlyAA: width = 6
+        else: width = 9
+        f, axes = plt.subplots(1,3,figsize=(width,2.5))
+        data = outdf.query('substrate == "{}" and total > 6'.format(each))
+        print(data)
+        patchid = ['far_patch', 'near_patch', 'same_patch']
+        patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each)]
+        for i, ax in enumerate(axes):
+            if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=data, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
+            else: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=data, order=['SAA', 'AA', 'S', 'O'], palette={'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}, compare=[('SAA', ('AA', 'S', 'O'))])
+            ax.set_yticks([0,0.5,1])
+            ax.set_ylim([-.05, 1.25])
+            sns.despine(ax=ax, bottom=True, trim=True)
+            xlabel= ''
+            if onlyAA: xlabel= 'AA'
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel('Transition\nprobability to\n{}'.format(patchlab[i]))
 
-    ax.set_yticks([0,0.5,1])
-    sns.despine(ax=ax, bottom=True, trim=True)
+        plt.tight_layout()
+        suffix = ''
+        if onlyAA: suffix= '_aa'
+        _file = os.path.join(outfolder, "{}_{}.pdf".format(_outfile+suffix, each))
+        plt.savefig(_file, dpi=300)
+        plt.cla()
+        plt.clf()
 
-    ax.set_xlabel('pre-diet condition')
-    ax.set_ylabel('Probability of\nstopping at a\nyeast patch')
+        """ This is for pie plots
+        # Data to plot
+        for each in ['+', '-']:
+            plt.figure(figsize=(2,2))
+            sizes = [np.median(outdf.query('condition == "{}"'.format(each))[jj]) for jj in patchid]
+            sizes /= np.sum(sizes)
+            print(sizes)
+            colors = ['#000000', '#0072b2', '#d55e00']
+            explode = (0.0, 0.1, 0.1)  # explode 1st slice
 
-    plt.tight_layout()
-    _file = os.path.join(outfolder, "{}.pdf".format(_outfile))
-    plt.savefig(_file, dpi=300)
-    plt.cla()
-    """
+            # Plot
+            plt.pie(sizes, labels=['', '', ''], explode=explode, colors=colors, autopct='', shadow=False, startangle=90)
+            plt.axis('equal')
+            _file = os.path.join(outfolder, "pie_{}_{}.pdf".format(_outfile, each))
+            plt.savefig(_file, dpi=300)
+            plt.cla()
+            plt.clf()
+        """
     ### delete objects
     del profile
 

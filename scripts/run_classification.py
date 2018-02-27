@@ -14,7 +14,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 pd.set_option('display.max_columns', 30)
-#pd.set_option('display.max_rows', 10000)
+pd.set_option('display.max_rows', 10000)
 pd.set_option('display.width', 260)
 pd.set_option('precision', 4)
 import tkinter as tk
@@ -39,8 +39,9 @@ def main():
     n_ses = len(sessions)
     stats = []
     _in, _out = 'kinematics', 'classifier'
-    infolder = os.path.join(profile.out(), _in)
-    outfolder = os.path.join(profile.out(), _out)
+    output = profile.out()
+    infolder = os.path.join(output, _in)
+    outfolder = os.path.join(output, _out)
 
     ### GO THROUGH SESSIONS
     for i_ses, each in enumerate(sessions):
@@ -52,7 +53,7 @@ def main():
         if not (meta['flags']['mistracked_frames'] > 30 or meta['condition'] =='NA' or nancheck or len(meta['food_spots']) == 0):
             classify = Classifier(df, meta)
             odf = classify.run(save_as=outfolder, ret=True)
-    print(odf.head(10))
+    #print(odf.iloc[1924:1926])
     ### delete objects
     del profile
 

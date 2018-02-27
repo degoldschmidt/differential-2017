@@ -130,7 +130,7 @@ if __name__ == '__main__':
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
 
     ### input data
-    T = 100
+    T = 1000
     random_stack = np.random.random((T,100,100))
     """
     df = pd.DataFrame({ 'time': 5.*np.arange(T),

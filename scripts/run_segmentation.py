@@ -8,7 +8,7 @@ from pytrack_analysis import Multibench
 import numpy as np
 import pandas as pd
 pd.set_option('display.max_columns', 30)
-#pd.set_option('display.max_rows', 10000)
+pd.set_option('display.max_rows', 10000)
 pd.set_option('display.width', 260)
 pd.set_option('precision', 4)
 import tkinter as tk
@@ -33,8 +33,14 @@ def main():
     n_ses = len(sessions)
     stats = []
     _in, _out = 'classifier', 'segments'
-    infolder = os.path.join(profile.out(), _in)
-    outfolder = os.path.join(profile.out(), _out)
+    if os.name == 'posix':
+        print('new foldername')
+        output = profile.out()#.replace('\\', '/')
+        print(output)
+    else:
+        output = profile.out()
+    infolder = os.path.join(output, _in)
+    outfolder = os.path.join(output, _out)
 
     ### GO THROUGH SESSIONS
     for i_ses, each in enumerate(sessions):
@@ -49,7 +55,7 @@ def main():
             print(csv_file+ ' not found!')
     for each in dfs.keys():
         print(each)
-        print(dfs[each].head(10))
+        print(dfs[each].head(15))
         print()
     ### delete objects
     del profile
