@@ -82,6 +82,7 @@ def main():
         # swarmbox
         ax = swarmbox(x='condition', y='ratio', data=data, order=['SAA', 'AA', 'S', 'O'], palette={'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}, compare=[('SAA', ('AA', 'S', 'O'))])
         ax.set_yticks([0,0.5,1])
+        ax.set_ylim([0,1.2])
         sns.despine(ax=ax, bottom=True, trim=True)
         ax.set_xlabel('pre-diet condition')
         #ax.set_ylabel('Probability of\nstopping at a\nyeast patch')
