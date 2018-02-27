@@ -8,60 +8,48 @@ import numpy as np
 import pandas as pd
 import os
 from scipy.stats import ranksums
+import argparse
 
-OVERWRITE = False
 
 def main():
     """
     --- general parameters
      *
     """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-ses', action="store", dest="session", type=int)
+    parser.add_argument('--force', action='store_true')
+    OVERWRITE = parser.parse_args().force
+    SESSION = parser.parse_args().session
+
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
     db = Experiment(profile.db())
-    sessions = db.sessions
-    n_ses = len(sessions)
 
     conds = ["SAA", "AA", "S", "O"]
-    EthoTotals = {each_condition: {} for each_condition in conds}
-    _in, _in2, _out = 'classifier', 'segments', 'plots'
-    infolder = os.path.join(profile.out(), _in)
-    in2folder = os.path.join(profile.out(), _in2)
-    outfolder = os.path.join(profile.out(), _out)
+    in_suffix  =  ['kinematics', 'classifier']
+    out_suffix =  'plots'
+    infolder = [os.path.join(profile.out(), suf) for suf in in_suffix]
+    outfolder = os.path.join(profile.out(), out_suffix)
     outdf = {'session': [], 'condition': [], 'ratio': []}
-    _outfile = 'probability_stop_aa'
+    _outfile = 'trajectory'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(hook_file) and not OVERWRITE:
         print('Found data hook')
         outdf = pd.read_csv(hook_file, index_col='id')
     else:
-        print('Compute data')
-        for i_ses, each in enumerate(sessions):
-            ### Loading data
-            try:
-                meta = each.load_meta()
-                csv_file = os.path.join(infolder, '{}_{}.csv'.format(each.name, _in))
-                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_encounter'))
-                ethodf = pd.read_csv(csv_file, index_col='frame')
-                segmdf = pd.read_csv(csv_file2, index_col='segment')
-                only_yeast_encounters = segmdf.query("state == 1")
-                counter = 0
-                for index, row in only_yeast_encounters.iterrows():
-                    pos = int(row['position'])
-                    end = int(row['position']+row['arraylen'])
-                    ethovec = np.array(ethodf['etho'])[pos:end]
-                    has_yeast_micromov = np.any(ethovec == 4)
-                    #print("Segment {:3d} at position {:6d} (len: {:4d}) has yeast micromovements: {}".format(int(index), pos, end-pos, has_yeast_micromov))
-                    if has_yeast_micromov:
-                        counter += 1
-                ratio = counter/len(only_yeast_encounters.index)
-                #print(ratio)
-                outdf['session'].append(each.name)
-                outdf['condition'].append(meta['condition'])
-                outdf['ratio'].append(ratio)
-            except FileNotFoundError:
-                pass #print(csv_file+ ' not found!')
+        print('Compute data for session {}_{:03}'.format(experiment, SESSION))
+        ### Loading data
+        try:
+            session = db.sessions[SESSION]
+            meta = session.load_meta()
+            csv_file = [os.path.join(infolder[j], '{}_{}.csv'.format(session.name, suf)) for j, suf in enumerate(in_suffix)]
+            dfs = [pd.read_csv(each_file, index_col='frame') for each_file in csv_file]
+        except FileNotFoundError:
+            print(csv_file[0] + ' not found!')
+    """
         outdf = pd.DataFrame(outdf)
         outdf = outdf.query('condition == "SAA" or condition == "S"')
         outdf['condition'] = outdf['condition'].replace({'SAA':'+'})
@@ -92,7 +80,7 @@ def main():
     _file = os.path.join(outfolder, "{}.pdf".format(_outfile))
     plt.savefig(_file, dpi=300)
     plt.cla()
-
+    """
     ### delete objects
     del profile
 
