@@ -1,6 +1,6 @@
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
-from pytrack_analysis.viz import set_font, swarmbox
+from pytrack_analysis.viz import set_font, swarmbox, plot_along
 from pytrack_analysis import Multibench
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,15 +8,40 @@ import numpy as np
 import pandas as pd
 import os
 from scipy.stats import ranksums
+import argparse
 
-OVERWRITE = False
 onlyAA = True
+
+def get_ratios(data, ds):
+    count = np.zeros(ds.shape, dtype=np.int32)
+    samecount = np.zeros(ds.shape, dtype=np.int32)
+    elsecount = np.zeros(ds.shape, dtype=np.int32)
+    for index, row in data.iterrows():
+        d = row['max_distance']
+        #print(d)
+        i = np.where(ds > d)[0][0]-1
+        #print(ds[i])
+        count[i] += 1
+        if row['to_same']:
+            samecount[i] += 1
+        else:
+            elsecount[i] += 1
+    ratios = np.divide(samecount, count)
+    oratios = np.divide(elsecount, count)
+    return ratios, oratios
 
 def main():
     """
     --- general parameters
      *
     """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('--check', action='store_true')
+    OVERWRITE = parser.parse_args().force
+    CHECK_ALL = parser.parse_args().check
+
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
@@ -31,7 +56,7 @@ def main():
     ### outputs
     _out = 'plots'
     outfolder = os.path.join(profile.out(), _out)
-    outdf = {'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'total': []}
+    outdf = {'session': [], 'condition': [], 'substrate': [], 'max_distance': [], 'to_same': [], 'start': [], 'end': []}
     _outfile = 'transition_per_distance'
     data_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(data_file) and not OVERWRITE:
@@ -64,34 +89,19 @@ def main():
                 ### diff: 2->1 -1; 1->2 1;
                 visit_transitions = np.diff(states) + 2*states[:-1] ##  3 (diff) 2 (yy) 4 (ss)
 
-                #print(only_food_visits[['state', 'spot']])
-                distances = np.arange(4,36,4)
-                same, other = np.zeros(distances.shape, dtype=np.int32), np.zeros(distances.shape, dtype=np.int32)
-
-                transitions = [np.where(visit_transitions == 2)[0], np.where(visit_transitions == 4)[0]]
-                Ntrans = [len(transition) for transition in transitions]
                 for i, sub in enumerate(['yeast', 'sucrose']):
+                    transitions = np.where(visit_transitions == 2*(i+1))[0]
+                    Ntrans = len(transitions)
                     for index in transitions:
-                        print("{}->{} @ {}-{}".format(spots[index], spots[index+1], pos[index]+lens[index], pos[index+1]))
                         dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
-                        if np.any(dist_to_pre>16):
-                            if spots[index]==spots[index+1]:
-                                same += 1
-                            else:
-                                dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
-
-                if same+near+far != Ntrans: print('we have a problem')
-                if Ntrans > 0:
-                    same /= Ntrans
-                    near /= Ntrans
-                    far /= Ntrans
-                #{'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': []}
-                outdf['session'].append(each.name)
-                outdf['condition'].append(meta['condition'])
-                outdf['same_patch'].append(same)
-                outdf['near_patch'].append(near)
-                outdf['far_patch'].append(far)
-                outdf['total'].append(Ntrans)
+                        max_dist = np.max(dist_to_pre)
+                        outdf['session'].append(each.name)
+                        outdf['condition'].append(meta['condition'])
+                        outdf['substrate'].append(sub)
+                        outdf['max_distance'].append(max_dist)
+                        outdf['to_same'].append((spots[index]==spots[index+1]))
+                        outdf['start'].append(pos[index]+lens[index])
+                        outdf['end'].append(pos[index+1])
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
 
@@ -99,13 +109,54 @@ def main():
         print("Saving to {}".format(data_file))
         outdf.to_csv(data_file, index_label='id')
     print(outdf)
+
+    print(np.min(outdf['max_distance']))
+
+    data1 = outdf.query('substrate == "yeast"').query('condition == "S"')
+    data2 = outdf.query('substrate == "yeast"').query('condition == "SAA"')
+    ds = np.arange(0,53,1)
+    f, ax = plt.subplots(figsize=(3,3))
+    ratios, oratios = get_ratios(data1, ds)
+    colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
+    ax.plot(ds, ratios, 'r-')
+    ratios, oratios = get_ratios(data2, ds)
+    ax.plot(ds, ratios, 'g-')
+    #plt.plot(ds, oratios, 'r-')
+    plot_along(f, ax)
+
+    if CHECK_ALL:
+        _id = -1
+        for index, row in outdf.iterrows():
+            f, ax = plt.subplots(figsize=(3,3))
+            print(row)
+            if _id != row['session']:
+                _id = int(row['session'][-3:])
+                session = db.sessions[_id]
+                meta = session.load_meta()
+                kinefolder = os.path.join(profile.out(), 'kinematics')
+                csv_file = os.path.join(kinefolder, '{}_{}.csv'.format(session.name, 'kinematics'))
+                df = pd.read_csv(csv_file, index_col='frame')
+            colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
+            for spot in meta['food_spots']:
+                ax.add_artist(plt.Circle((spot['x'], spot['y']), radius=1.5, color=colors[spot['substr']]))
+                ax.add_artist(plt.Circle((spot['x'], spot['y']), radius=2.5, color=colors[spot['substr']], lw=1, ls='--', fill=False))
+                start, end = row['start'], row['end']
+                ax.plot(df.iloc[start:end]['head_x'], df.iloc[start:end]['head_y'], lw=0.5)
+            ax.set_xlim([-30,30])
+            ax.set_ylim([-30,30])
+            ax.set_aspect('equal')
+            plot_along(f, ax, fullscreen=False)
+            plt.clf()
+            plt.cla()
+            plt.close()
+
+    """
     if onlyAA:
         outdf = outdf.query('condition == "SAA" or condition == "S"')
         outdf['condition'] = outdf['condition'].replace({'SAA':'+'})
         outdf['condition'] = outdf['condition'].replace({'S':'-'})
         newfile = os.path.join(outfolder, "{}_aa.csv".format(_outfile))
         outdf.to_csv(newfile, index_label='id')
-
     #### Plotting
     if onlyAA: width = 6
     else: width = 9
@@ -134,23 +185,7 @@ def main():
     plt.savefig(_file, dpi=300)
     plt.cla()
     plt.clf()
-
-    # Data to plot
-    for each in ['+', '-']:
-        plt.figure(figsize=(2,2))
-        sizes = [np.median(outdf.query('condition == "{}"'.format(each))[jj]) for jj in patchid]
-        sizes /= np.sum(sizes)
-        print(sizes)
-        colors = ['#000000', '#0072b2', '#d55e00']
-        explode = (0.0, 0.1, 0.1)  # explode 1st slice
-
-        # Plot
-        plt.pie(sizes, labels=['', '', ''], explode=explode, colors=colors, autopct='', shadow=False, startangle=90)
-        plt.axis('equal')
-        _file = os.path.join(outfolder, "pie_{}_{}.pdf".format(_outfile, each))
-        plt.savefig(_file, dpi=300)
-        plt.cla()
-        plt.clf()
+    """
     ### delete objects
     del profile
 

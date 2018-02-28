@@ -24,8 +24,12 @@ f, ax = plt.subplots(figsize=(3,3))
 
 for i in range(inner_pos.shape[1]):
     if i==0:
-        circ1 = plt.Circle(inner_pos[:,i], radius=2.4, ls='--', fill=False)
-        circ2 = plt.Circle(outer_pos[:,i], radius=2.4, ls='--', fill=False)
+        _radius = 4.
+        print('Radius: {}'.format(_radius))
+        ax.plot(inner_pos[0,i], inner_pos[1,i], 'r.')
+        ax.plot(outer_pos[0,i], outer_pos[1,i], 'b.')
+        circ1 = plt.Circle(inner_pos[:,i], radius=_radius, ls='--', fill=False)
+        circ2 = plt.Circle(outer_pos[:,i], radius=_radius, ls='--', fill=False)
         ax.add_artist(circ1)
         ax.add_artist(circ2)
     circ = plt.Circle(inner_pos[:,i], radius=.15, color=colors[(i+1)%2])
