@@ -9,15 +9,13 @@ else:
 import matplotlib.backends.tkagg as tkagg
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from tkinter import filedialog
-
-from os.path import expanduser
-HOME = expanduser("~")
+import os
+HOME = os.path.expanduser("~")
 
 class GUI(object):
     def __init__(self, master, res):
         # Create a canvas
         self.guiw, self.guih = res
-        print(self.guiw, self.guih)
         self.master = master
         self.master.minsize(self.guiw, self.guih)
         self.master.title("PyTrack-preview")
@@ -28,10 +26,15 @@ class GUI(object):
         self.X = []
         self.Y = []
         self.filelist = []
+        self.cur = None
 
         # display the menu
         self.master.config(menu=menubar)
+        self.previewFrame = tk.LabelFrame(self.master, text="Preview", padx=5, pady=5)
+        self.previewFrame.pack(side=tk.LEFT, padx=10, pady=10)
         self.canvas, self.f, self.ax = self.init_canvas()
+        self.listFrame = tk.LabelFrame(self.master, text="Filelist", padx=5, pady=5)
+        self.listFrame.pack(side=tk.LEFT, padx=10, pady=10,fill=tk.BOTH, expand=1)
         self.listbox = self.init_filelist()
         self.listbox.bind('<Double-Button-1>', self.get_filename)
 
@@ -47,17 +50,17 @@ class GUI(object):
             # get selected line index
             index = self.listbox.curselection()[0]
             # get the line's text
-            seltext = self.listbox.get(index)
+            self.cur = self.listbox.get(index)
             # load data and plot
-            if seltext.endswith('csv'):
-                data = pd.read_csv(seltext, sep=' ', index_col=False)
+            if self.cur.endswith('csv'):
+                data = pd.read_csv(self.cur, sep=' ', index_col=False)
                 self.X, self.Y = data.loc[:, self.cols[0]], data.loc[:, self.cols[1]]
                 self.update_ax()
 
 
 
     def init_canvas(self):
-        canvas = tk.Canvas(self.master, width=self.guih, height=self.guih)
+        canvas = tk.Canvas(self.previewFrame, width=self.guih, height=self.guih)
         canvas.pack(side=tk.LEFT)
         # Create the figure we desire to add to an existing canvas
         f, ax = plt.subplots(figsize=(self.guih/100, self.guih/100))
@@ -69,7 +72,7 @@ class GUI(object):
         return canvas, f, ax
 
     def init_filelist(self):
-        listbox = tk.Listbox(self.master)
+        listbox = tk.Listbox(self.listFrame)
         listbox.pack(fill=tk.BOTH, expand=1)
         for item in self.filelist:
             listbox.insert(tk.END, item)
@@ -133,6 +136,7 @@ class GUI(object):
         yc = (np.nanmax(y)+np.nanmin(y))/2
         self.ax.set_xlim([xc-1.05*rrange/2,xc+1.05*rrange/2])
         self.ax.set_ylim([yc-1.05*rrange/2,yc+1.05*rrange/2])
+        self.ax.set_title(os.path.basename(self.cur))
         f_x, f_y = 0, 0
         self.fig_photo = draw_figure(self.canvas, self.f, loc=(f_x, f_y))
 
