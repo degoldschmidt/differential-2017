@@ -54,7 +54,7 @@ class GUI(object):
             # load data and plot
             if self.cur.endswith('csv'):
                 data = pd.read_csv(self.cur, sep=' ', index_col=False)
-                self.X, self.Y = data.loc[:, self.cols[0]], data.loc[:, self.cols[1]]
+                self.X, self.Y = data.loc[10000:, self.cols[0]], data.loc[10000:, self.cols[1]]
                 self.update_ax()
 
 

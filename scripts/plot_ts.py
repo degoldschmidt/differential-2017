@@ -101,11 +101,14 @@ def main():
     profile = get_profile('DIFF', 'degoldschmidt', script=thisscript)
     db = Experiment(profile.db()) # database from file
 
+    in_suffix  =  ['kinematics', 'classifier']
+    out_suffix =  'plots'
+
     ### GO THROUGH SESSIONS
-    for each in db.sessions:
+    for each in db.sessions[:1]:
         print(each.name)
         df_raw, meta = each.load(VERBOSE=False)
-        csv_file = os.path.join(profile.out(),  each.name+'_kinematics.csv')
+        csv_file = os.path.join(profile.out(), in_suffix[0],  each.name+'_kinematics.csv')
         df = pd.read_csv(csv_file, index_col='frame')
         df['major'] = df_raw['major']
         df['minor'] = df_raw['minor']
