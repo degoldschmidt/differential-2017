@@ -2,6 +2,7 @@ from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
 import pytrack_analysis.plot as plot
 from pytrack_analysis import Multibench
+import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -10,8 +11,8 @@ import os
 from scipy.stats import ranksums
 import argparse
 
-def plot_swarm(data, x, y, sub, conds, mypal):
-    f, ax = plt.subplots(figsize=(3,2.5))
+def plot_ccdf(data, x, y, sub, conds, mypal):
+    f, ax = plt.subplots(figsize=(3.5,2.5))
     rdata = data.query('substrate == "{}"'.format(sub)).dropna()
     querystr = ''
     astr = ' or '
@@ -21,9 +22,9 @@ def plot_swarm(data, x, y, sub, conds, mypal):
     rdata = rdata.query(querystr[:-len(astr)])
     # swarmbox
     if len(conds) > 2:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+        ax = plot.ccdf(rdata, xy=y, c=x, palette=mypal, ax=ax)
     else:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+        ax = plot.ccdf(rdata, xy=y, c=x, palette=mypal, ax=ax)
     return ax
 
 def main():
@@ -54,58 +55,49 @@ def main():
     infolder = os.path.join(profile.out(), _in)
     in2folder = os.path.join(profile.out(), _in2)
     outfolder = os.path.join(profile.out(), _out)
-    outdf = {'session': [], 'condition': [], 'substrate': [], 'ratio': []}
-    _outfile = 'probability_stop'
+    outdf = {'session': [], 'condition': [], 'substrate': [], 'duration': []}
+
+    _outfile = 'visits_ccdf'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(hook_file) and not OVERWRITE:
         print('Found data hook')
         outdf = pd.read_csv(hook_file, index_col='id')
     else:
         print('Compute data')
+        allsegments = []
         for i_ses, each in enumerate(sessions):
             ### Loading data
             try:
                 meta = each.load_meta()
+                print(each.name)
                 csv_file = os.path.join(infolder, '{}_{}.csv'.format(each.name, _in))
-                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_encounter'))
+                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_visit'))
                 ethodf = pd.read_csv(csv_file, index_col='frame')
                 segmdf = pd.read_csv(csv_file2, index_col='segment')
-
                 for j, sub in enumerate(['yeast', 'sucrose']):
-                    only_encounters = segmdf.query("state == {}".format(j+1))
-                    counter = 0
-                    for index, row in only_encounters.iterrows():
-                        pos = int(row['position'])
-                        end = int(row['position']+row['arraylen'])
-                        ethovec = np.array(ethodf['etho'])[pos:end]
-                        has_micromovs = np.any(ethovec == j+4)
-                        if has_micromovs:
-                            counter += 1
-                    if len(only_encounters.index) > 0:
-                        ratio = counter/len(only_encounters.index)
-                    else:
-                        ratio = np.nan
-                    #print(ratio)
-                    outdf['session'].append(each.name)
-                    outdf['condition'].append(meta['condition'])
-                    outdf['substrate'].append(sub)
-                    outdf['ratio'].append(ratio)
+                    only_visits = segmdf.query("state == {}".format(j+1))
+                    only_visits['session'] = each.name
+                    only_visits['condition'] = meta['condition']
+                    only_visits['substrate'] = sub
+                    allsegments.append(only_visits)
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
-        outdf = pd.DataFrame(outdf)
+        outdf = pd.concat(allsegments)
         outdf.to_csv(hook_file, index_label='id')
     print(outdf)
 
     #### Plotting
+    my_ylims = [12, 3]
+    annos = [(13.,0.2), (2.5,0.05)]
+    my_yticks = [2, 1]
     for j, sub in enumerate(['yeast', 'sucrose']):
-        ax = plot_swarm(outdf, 'condition', 'ratio', sub, conds, mypal)
-
+        ax = plot_ccdf(outdf, 'condition', 'duration', sub, conds, mypal)
         ### extra stuff
-        ax.set_yticks([0,0.5,1])
-        ax.set_ylim([-0.1,1.2])
-        sns.despine(ax=ax, bottom=True, trim=True)
-        ax.set_xlabel('pre-diet condition')
-        ax.set_ylabel('Probability of\nstopping at a\n{} patch'.format(sub))
+        #ax.set_yticks(np.arange(0,my_ylims[j]+1,my_yticks[j]))
+        ax.set_ylim([0.0001,1.5])
+        sns.despine(ax=ax, trim=False)
+        ax.set_xlabel('Duration $x$ [s]')
+        ax.set_ylabel('p($T_{' +sub+ '}$ $\geq$ $x$)')
 
         ### saving files
         plt.tight_layout()
