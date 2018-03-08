@@ -47,7 +47,7 @@ def main():
 
     _outfile = 'sort_ethogram'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
-    f, axes = plt.subplots(ncols=len(conds), figsize=(len(conds)*3,2.5), sharey=True)
+    f, axes = plt.subplots(ncols=len(conds), figsize=(len(conds)*3,3.8), sharey=True)
     ethocolor = {4: "#ffc04c", 5: "#4c8bff", 'NA': '#e2e2e2'}
     totaldf = { 'session': [], 'condition': [], 'totalY': [], 'totalS': [], 'sortbyY': [] }
     if os.path.isfile(hook_file) and not OVERWRITE:
@@ -110,8 +110,10 @@ def main():
             pass #print(csv_file+ ' not found!')
 
     axes[0].set_ylabel('flies')
+    f.suptitle("pre-diet condition:", x=0.075, y=0.98)
     for i, ax in enumerate(axes):
         print(i)
+        ax.set_title("{} ($n$={})".format(conds[i], len(sort_dict[conds[i]].index)))
         ax.set_xlabel('time [min]')
         ax.set_xlim([0,60])
         ax.set_yticks(np.arange(0,61,10))
@@ -122,7 +124,7 @@ def main():
 
 
     ### saving files
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, -0.03, 1, 0.95])
     _file = os.path.join(outfolder, "{}".format(_outfile))
     plt.savefig(_file+'.pdf', dpi=300)
     plt.savefig(_file+'.png', dpi=300)
