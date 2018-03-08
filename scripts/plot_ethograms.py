@@ -102,10 +102,10 @@ def main():
             panel = conds.index(cond)
             pos = sort_dict[cond].query('session == "{}"'.format(each.name)).index[0]
             print(each.name, panel, cond, pos)
-            focus = [4,5]
-            axes[panel].vlines(np.array(ethodf['elapsed_time'])[::10]/60.,pos,pos+1, color=ethocolor['NA'])
+            focus = [5,4]
+            axes[panel].vlines(np.array(ethodf['elapsed_time'])[::10]/60.,pos,pos+1, color=ethocolor['NA'], lw=0.1)
             for i in focus:
-                axes[panel].vlines(np.array(ethodf.query('etho == {}'.format(i))['elapsed_time'])/60.,pos,pos+1, color=ethocolor[i])
+                axes[panel].vlines(np.array(ethodf.query('etho == {}'.format(i))['elapsed_time'])/60.,pos,pos+1, color=ethocolor[i], lw=0.1)
         except FileNotFoundError:
             pass #print(csv_file+ ' not found!')
 
