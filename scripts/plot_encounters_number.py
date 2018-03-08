@@ -55,9 +55,9 @@ def main():
     infolder = os.path.join(profile.out(), _in)
     in2folder = os.path.join(profile.out(), _in2)
     outfolder = os.path.join(profile.out(), _out)
-    outdf = {'session': [], 'condition': [], 'substrate': [], 'duration': []}
+    outdf = {'session': [], 'condition': [], 'substrate': [], 'number': []}
 
-    _outfile = 'visits_total_duration'
+    _outfile = 'encounters_number'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(hook_file) and not OVERWRITE:
         print('Found data hook')
@@ -69,20 +69,17 @@ def main():
             try:
                 meta = each.load_meta()
                 csv_file = os.path.join(infolder, '{}_{}.csv'.format(each.name, _in))
-                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_visit'))
+                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_encounter'))
                 ethodf = pd.read_csv(csv_file, index_col='frame')
                 segmdf = pd.read_csv(csv_file2, index_col='segment')
 
                 for j, sub in enumerate(['yeast', 'sucrose']):
-                    only_visits = segmdf.query("state == {}".format(j+1))
+                    only_encounters = segmdf.query("state == {}".format(j+1))
                     outdf['session'].append(each.name)
                     outdf['condition'].append(meta['condition'])
                     outdf['substrate'].append(sub)
-                    total = np.sum(only_visits['duration'])/60.
-                    if np.isnan(total):
-                        total = 0.
-                    outdf['duration'].append(total)
-                    print(outdf['session'][-1], outdf['condition'][-1], outdf['substrate'][-1], outdf['duration'][-1])
+                    outdf['number'].append(len(only_encounters.index))
+                    print(outdf['session'][-1], outdf['condition'][-1], outdf['substrate'][-1], outdf['number'][-1])
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
         outdf = pd.DataFrame(outdf)
@@ -90,11 +87,11 @@ def main():
     print(outdf)
 
     #### Plotting
-    my_ylims = [60, 25]
-    annos = [(58,1), (21,0.4)]
+    my_ylims = [100, 80]
+    annos = [(100,1), (78,1)]
     my_yticks = [20, 10]
     for j, sub in enumerate(['yeast', 'sucrose']):
-        ax = plot_swarm(outdf, 'condition', 'duration', sub, conds, mypal)
+        ax = plot_swarm(outdf, 'condition', 'number', sub, conds, mypal)
         annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]
         for each in annotations:
             y = annos[j][0]
@@ -103,11 +100,11 @@ def main():
             each.set_position((each.get_position()[0], y))
         print(annotations)
         ### extra stuff
-        ax.set_yticks(np.arange(0,my_ylims[j]+1,my_yticks[j]))
-        ax.set_ylim([-0.1*my_ylims[j],1.1*my_ylims[j]])
+        #ax.set_yticks(np.arange(0,my_ylims[j]+1,my_yticks[j]))
+        #ax.set_ylim([-0.1*my_ylims[j],1.1*my_ylims[j]])
         sns.despine(ax=ax, bottom=True, trim=True)
         ax.set_xlabel('pre-diet condition')
-        ax.set_ylabel('Total duration of\n{} visits [min]'.format(sub))
+        ax.set_ylabel('Number of\n{} encounters'.format(sub))
 
         ### saving files
         plt.tight_layout()

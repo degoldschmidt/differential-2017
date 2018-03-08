@@ -1,57 +1,31 @@
-import os
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
-import pytrack_analysis.preprocessing as prp
-from pytrack_analysis import Classifier
+import pytrack_analysis.plot as plot
 from pytrack_analysis import Multibench
-from pytrack_analysis.viz import set_font, swarmbox
-
-import warnings
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
+import os
+from scipy.stats import ranksums
+import argparse
 pd.set_option('display.max_columns', 30)
-#pd.set_option('display.max_rows', 10000)
+pd.set_option('display.max_rows', 10000)
 pd.set_option('display.width', 260)
 pd.set_option('precision', 4)
-import tkinter as tk
-
-def plot_cumulatives(data, color=None, ax=None, title=None, tiky=None, maxy=None, reduce=None):
-    maxx = 108000
-    N = np.array(data).shape[0]
-    print(N)
-    dmean = np.mean(np.array(data), axis=1)
-    dsem = np.std(np.array(data), axis=1)/np.sqrt(N)
-    print(dmean)
-    for col in data.columns:
-        ts = np.array(data.loc[:,col])
-        ax.plot(np.arange(0,maxx), ts/60, color='#8c8c8c', alpha=0.5, lw=0.5)
-    ax.plot(np.arange(0,maxx), dmean/60, color=color, alpha=0.9, lw=0.75)
-    ax.fill_between(np.arange(0,maxx), (dmean-dsem)/60, (dmean+dsem)/60, color=color, alpha=0.2, lw=0)
-    ax.set_title(title)
-    ax.set_xlim([-0.01*maxx,maxx])
-    ax.set_xticks([0, maxx/2, maxx])
-    ax.set_xticklabels(['0', '30', '60'])
-    ax.set_xlabel("Time [min]")
-    ax.set_ylim([-.1*maxy,1.05*maxy])
-    if not reduce:
-        ax.set_yticks(np.arange(0,maxy+1,tiky))
-        ax.set_ylabel("Cumulative\nduration of\nmicromovements\n[min]")
-        sns.despine(ax=ax, trim=True)
-    else:
-        ax.yaxis.set_visible(False)
-        ax.spines['left'].set_visible(False)
-        sns.despine(ax=ax, left=True, trim=True)
-    return ax
 
 def main():
     """
     --- general parameters
      *
     """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('-c', nargs='+', type=str)
+    OVERWRITE = parser.parse_args().force
+
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
@@ -59,41 +33,100 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
-
     conds = ["SAA", "AA", "S", "O"]
-    Ethos = {each_condition: {} for each_condition in conds}
-    infolder = os.path.join(profile.out(), 'classify')
+    if parser.parse_args().c is not None:
+        conds = parser.parse_args().c
+    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    mypal = {condition: colormap[condition]  for condition in conds}
+    EthoTotals = {each_condition: {} for each_condition in conds}
+    _in, _in2, _out = 'classifier', 'segments', 'plots'
+    infolder = os.path.join(profile.out(), _in)
+    in2folder = os.path.join(profile.out(), _in2)
+    outfolder = os.path.join(profile.out(), _out)
+    outdf = {'session': [], 'condition': [], 'substrate': [], 'number': []}
+
+    _outfile = 'sort_ethogram'
+    hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
+    f, axes = plt.subplots(ncols=len(conds), figsize=(len(conds)*3,2.5), sharey=True)
+    ethocolor = {4: "#ffc04c", 5: "#4c8bff", 'NA': '#e2e2e2'}
+    totaldf = { 'session': [], 'condition': [], 'totalY': [], 'totalS': [], 'sortbyY': [] }
+    if os.path.isfile(hook_file) and not OVERWRITE:
+        print('Found data hook')
+        allthem = pd.read_csv(hook_file, index_col='id')
+    else:
+        print('Compute data')
+        for i_ses, each in enumerate(sessions):
+            try:
+                meta = each.load_meta()
+                csv_file = os.path.join(infolder, '{}_{}.csv'.format(each.name, _in))
+                csv_file2 = os.path.join(in2folder, '{}_{}.csv'.format(each.name, _in2+'_etho'))
+                ethodf = pd.read_csv(csv_file, index_col='frame')
+                segmdf = pd.read_csv(csv_file2, index_col='segment')
+                only_Ymm = segmdf.query("state == 4")
+                only_Smm = segmdf.query("state == 5")
+                totalY_mm = np.sum(only_Ymm['duration'])/60.
+                totalS_mm = np.sum(only_Smm['duration'])/60.
+                if np.isnan(totalY_mm): totalY_mm = 0.
+                if np.isnan(totalS_mm): totalS_mm = 0.
+                print(each.name, totalY_mm, totalS_mm)
+                totaldf['session'].append(each.name)
+                totaldf['condition'].append(meta['condition'])
+                totaldf['totalY'].append(totalY_mm)
+                totaldf['totalS'].append(totalS_mm)
+                totaldf['sortbyY'].append(totalY_mm > totalS_mm)
+            except FileNotFoundError:
+                pass #print(csv_file+ ' not found!')
+        totaldf = pd.DataFrame(totaldf)
+        sortY = totaldf.query('sortbyY == True').sort_values(by=['totalY'])
+        sortS = totaldf.query('sortbyY == False').sort_values(by=['totalS'], ascending=False)
+        allthem = pd.concat([sortS, sortY])
+        allthem.to_csv(hook_file, index_label='id')
+    ### sorting into condition
+    sort_dict = {   'SAA': allthem.query('condition == "SAA"').reset_index(drop=True),
+                    'AA': allthem.query('condition == "AA"').reset_index(drop=True),
+                    'S': allthem.query('condition == "S"').reset_index(drop=True),
+                    'O': allthem.query('condition == "O"').reset_index(drop=True),}
+    print(sort_dict['SAA'])
+    print(sort_dict['AA'])
+    print(sort_dict['S'])
+    print(sort_dict['O'])
+
+    ### Plotting vlines for each session
     for i_ses, each in enumerate(sessions):
         ### Loading data
         try:
             meta = each.load_meta()
-            csv_file = os.path.join(infolder,  each.name+'_classifier.csv')
-            df = pd.read_csv(csv_file, index_col='frame')
-            Ethos[meta['condition']][each.name] = df['etho']
-            print(each.name)
+            csv_file = os.path.join(infolder, '{}_{}.csv'.format(each.name, _in))
+            ethodf = pd.read_csv(csv_file, index_col='frame')
+            cond = meta['condition']
+            panel = conds.index(cond)
+            pos = sort_dict[cond].query('session == "{}"'.format(each.name)).index[0]
+            print(each.name, panel, cond, pos)
+            focus = [4,5]
+            axes[panel].vlines(np.array(ethodf['elapsed_time'])[::10]/60.,pos,pos+1, color=ethocolor['NA'])
+            for i in focus:
+                axes[panel].vlines(np.array(ethodf.query('etho == {}'.format(i))['elapsed_time'])/60.,pos,pos+1, color=ethocolor[i])
         except FileNotFoundError:
-            pass
+            pass #print(csv_file+ ' not found!')
 
-    ### Plotting
-    colors = ["#98c37e", "#5788e7", "#D66667", "#2b2b2b"]
-    maxy = {'Yeast': 50, 'Sucrose': 15}
-    tiky = {'Yeast': 10, 'Sucrose': 5}
-    for each_substr in ['Yeast', 'Sucrose']:
-        f, axes = plt.subplots(1, 4, figsize=(8,3), dpi=400, sharey=True)
-        for i, each_cond in enumerate(conds):
-            _reduce=False
-            if i>0:
-                _reduce=True
-            df = pd.DataFrame(EthoTotals[each_substr][each_cond])
-            axes[i] = plot_cumulatives(df, color=colors[i], ax=axes[i], title=each_cond, tiky=tiky[each_substr], maxy=maxy[each_substr], reduce=_reduce)
-            f.suptitle('{}'.format(each_substr), fontsize=10, fontweight='bold', x=0.05, y=0.98, horizontalalignment='left')
-        ### Saving to file
-        plt.subplots_adjust(top=0.8)
-        plt.tight_layout()
-        _file = os.path.join(profile.out(), 'plots', 'cumsum_etho_{}.png'.format(each_substr))
-        print(_file)
-        plt.savefig(_file, dpi=600)
-        plt.cla()
+    axes[0].set_ylabel('flies')
+    for i, ax in enumerate(axes):
+        print(i)
+        ax.set_xlabel('time [min]')
+        ax.set_xlim([0,60])
+        ax.set_yticks(np.arange(0,61,10))
+        sns.despine(ax=ax, trim=True)
+        if i > 0:
+            ax.get_yaxis().set_visible(False)
+            ax.spines['left'].set_visible(False)
+
+
+    ### saving files
+    plt.tight_layout()
+    _file = os.path.join(outfolder, "{}".format(_outfile))
+    plt.savefig(_file+'.pdf', dpi=300)
+    plt.savefig(_file+'.png', dpi=300)
+    plt.cla()
 
     ### delete objects
     del profile
