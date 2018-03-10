@@ -116,8 +116,8 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(8,6), interv
         T = np.array(data.index)
     else:
         T = np.arange(interval[0],interval[1],dtype=np.int32)
-    xarray = df.loc[T[0]:T[-1], time] - df.loc[T[0], time]
-    yarrays = df.loc[T[0]:T[-1], cols]
+    xarray = data.loc[T[0]:T[-1], time] - data.loc[T[0], time]
+    yarrays = data.loc[T[0]:T[-1], cols]
     gs = GridSpec(N, 2*N, height_ratios=[2,2,2,1,1])
     gs.update(wspace=2)
     ## video axis
@@ -214,7 +214,7 @@ def respine(ax, interval, tickint, bottom):
         sns.despine(ax=ax, bottom=bottom, trim=True)
     return ax
 
-if __name__ == '__main__':
+def main():
     ### CLI arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-ses', action="store", dest="session", type=int)
@@ -279,3 +279,9 @@ if __name__ == '__main__':
     run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_tseries, pixelpos, outfile=_file)
     ### delete objects
     del profile
+
+if __name__ == '__main__':
+    # runs as benchmark test
+    test = Multibench("", SILENT=False)
+    test(main)
+    del test
