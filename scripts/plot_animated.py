@@ -21,6 +21,9 @@ from pytrack_analysis.viz import set_font, swarmbox
 
 import argparse
 
+ONLY_VIDEO = False
+ONLY_TRAJ = True
+NO_ANNOS = True
 
 def get_tseries_axes(grid, position, sharex=None):
     row=position[0]
@@ -80,29 +83,32 @@ print(radius) ##100
 def updatefig(i, *image):
     xpos, ypos = image[3][0][i-4970], image[3][1][i-4970]
     etho = image[3][2][i-4970]
-    bxpos, bypos = image[3][0][i-4970], image[3][1][i-4970]
+    bxpos, bypos = image[3][3][i-4970], image[3][4][i-4970]
     y = int(359.3853 - 8.543 * (-1.))##image[3][1][i-6101]
     x = int(366.1242 + 8.543 * 15.)##image[3][0][i-6101]
+    a, b = (x-radius), (y-radius)
     if i%100==0:
         print(i, xpos, ypos, etho)
 
     ### update plots
-    if len(image[2].get_lines()) < 1:
-        print("first plot")
-        image[2].plot([bxpos - (x-radius), xpos - (x-radius)],[bypos - (y-radius), ypos - (y-radius)], 'b-', lw=3)
+    if len(image[2].get_lines()) == 0:
+        image[2].plot([xpos-a, bxpos-a], [ypos-b, bypos-b], color='#ff228c', ls='-', lw=1)
     image[0].set_array(image[1].get_data(i)[y-radius:y+radius, x-radius:x+radius])
     image[2].set_title("frame #{}".format(i))
-    image[2].plot(xpos - (x-radius), ypos - (y-radius), color=palette[etho], marker='.', markersize=5)
-    image[2].get_lines()[1].set_data([bxpos - (x-radius), bxpos - (x-radius)],[bypos - (y-radius), ypos - (y-radius)])
-
+    if not NO_ANNOS:
+        image[2].plot(xpos-a, ypos-b, color=palette[etho], marker='.', markersize=5)
+    else:
+        image[2].plot(xpos-a, ypos-b, color='#ff228c', marker='.', markersize=5)
+        image[2].get_lines()[0].set_data([xpos-a, bxpos-a], [ypos-b, bypos-b])
     return image[0],
 
-def init_animation(data, time=None, cols=None, video=None, figsize=(8,6), interval=None, playback=1):
+def init_animation(data, time=None, cols=None, video=None, figsize=(8,6), interval=None, playback=1, meta=None):
     ts_colors = [   '#8dd3c7',
                     '#fcfc2f',
                     '#bebada',
                     '#fb8072',
                     '#80b1d3',]
+    spot_colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
     fig = plt.figure(figsize=figsize)
     ## gridspec
     N = len(cols)   # number of rows
@@ -116,52 +122,82 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(8,6), interv
     gs.update(wspace=2)
     ## video axis
     vid = imageio.get_reader(video)
-    ax_video = plt.subplot(gs[:,:N]) ### N == 5
+    if ONLY_VIDEO:
+        fig, ax_video = plt.subplots(figsize=(6,6))
+    else:
+        ax_video = plt.subplot(gs[:,:N]) ### N == 5
     ax_video.set_aspect('equal')
     sns.despine(ax=ax_video, bottom=True, left=True)
     ax_video.get_xaxis().set_visible(False)
     ax_video.get_yaxis().set_visible(False)
     # initial frame
-    radius = int(8.543 * 12.5)
-    y = int(359.3853 - 8.543 * (-1.))##image[3][1][i-6101]
-    x = int(366.1242 + 8.543 * 15.)##image[3][0][i-6101]
-    im = ax_video.imshow(vid.get_data(interval[0])[y-radius:y+radius, x-radius:x+radius], animated=True)
+    scale = meta['arena']['scale']
+    radius = int(scale * 12.5)
+    x0, y0 = meta['arena']['x'], meta['arena']['y']
+    x, y = int(x0 + scale * 15.), int(y0 - scale * (-1.))
 
-    ax_tseries, lines = [], []
-    ax, l = get_tseries_axes(gs, [4, 5])
-    l.set_color(ts_colors[0])
-    ax.set_xlim(0, 1.1*np.max(xarray))
-    if np.min(data[cols[-1]]) < 0:
-        ax.set_ylim(1.1*np.min(data[cols[-1]]), 1.1*np.max(data[cols[-1]]))
-    else:
-        ax.set_ylim(0, 1.1*np.max(data[cols[-1]]))
-    sns.despine(ax=ax, trim=True)
-    ax.set_xlabel(time)
-    ax.set_ylabel(cols[-1])
-    ax_tseries.append(ax)
-    lines.append(l)
-    for i in range(1,5):
-        ax, l = get_tseries_axes(gs, [4-i, 5], sharex=ax_tseries[0])
-        l.set_color(ts_colors[i])
+    im = ax_video.imshow(vid.get_data(interval[0])[y-radius:y+radius, x-radius:x+radius], animated=True)
+    if not ONLY_TRAJ:
+        for ii,each in enumerate(meta['food_spots']):
+            sx, sy = scale * each['x'] + x0 - (x-radius), -scale * each['y'] + y0 - (y-radius)
+            ax_video.add_artist(plt.Circle((sx,sy), scale*1.5, color=spot_colors[each['substr']], lw=2.5, alpha=0.5, fill=False, zorder=100))
+            if ii in [1, 3, 9]:
+                ax_video.add_artist(plt.Circle((sx,sy), scale*2.5, color='#ffffff', ls='dashed', lw=1.5, alpha=0.5, fill=False, zorder=100))
+            if ii == 1:
+                ax_video.add_artist(plt.Circle((sx,sy), scale*5, color='#ffffff', ls='dotted', lw=1, alpha=0.5, fill=False, zorder=100))
+            #ax_video.text(sx,sy, "{}".format(ii), zorder=100)
+
+    ax_tseries, lines = None, None
+    if not ONLY_VIDEO:
+        ax_tseries, lines = [], []
+        ax, l = get_tseries_axes(gs, [4, 5])
+        l.set_color(ts_colors[0])
         ax.set_xlim(0, 1.1*np.max(xarray))
-        ax.set_ylabel(cols[-i-1])
-        if np.min(data[cols[-i-1]]) < 0:
-            ax.set_ylim(1.1*np.min(data[cols[-i-1]]), 1.1*np.max(data[cols[-i-1]]))
+        if np.min(data[cols[-1]]) < 0:
+            ax.set_ylim(1.1*np.min(data[cols[-1]]), 1.1*np.max(data[cols[-1]]))
         else:
-            ax.set_ylim(0, 1.1*np.max(data[cols[-i-1]]))
-        sns.despine(ax=ax, bottom=True, trim=True)
+            ax.set_ylim(0, 1.1*np.max(data[cols[-1]]))
+        sns.despine(ax=ax, trim=True)
+        ax.set_xlabel(time)
+        ax.set_ylabel(cols[-1])
         ax_tseries.append(ax)
         lines.append(l)
+        for i in range(1,5):
+            ax, l = get_tseries_axes(gs, [4-i, 5], sharex=ax_tseries[0])
+            l.set_color(ts_colors[i])
+            ax.set_xlim(0, 1.1*np.max(xarray))
+            ax.set_ylabel(cols[-i-1])
+            if np.min(data[cols[-i-1]]) < 0:
+                ax.set_ylim(1.1*np.min(data[cols[-i-1]]), 1.1*np.max(data[cols[-i-1]]))
+            else:
+                ax.set_ylim(0, 1.1*np.max(data[cols[-i-1]]))
+            sns.despine(ax=ax, bottom=True, trim=True)
+            ax_tseries.append(ax)
+            lines.append(l)
+
+        ### thresholds
+        ax_tseries[4].hlines(2.5, ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+        ax_tseries[4].hlines(5, ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+
+        ax_tseries[3].hlines(2., ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+        #ax_tseries[3].hlines(4., ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+
+        ax_tseries[2].hlines(125., ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+        ax_tseries[2].hlines(-125., ax_tseries[4].get_xlim()[0], ax_tseries[4].get_xlim()[1], colors="#aaaaaa", linestyles='dashed')
+
     return fig, ax_video, ax_tseries, T, xarray, yarrays, im, vid, lines
 
 def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts, pixelpos, factor=1, outfile="out.mp4"):
     myinterval = 1000./(30*factor)
     print("Interval between frame: {}".format(myinterval))
-    ani_lines = anim.FuncAnimation(fig, animate, frames, blit=True, fargs=(lines, xarray, yarrays, ax_ts), interval=myinterval)
+    if not ONLY_VIDEO:
+        ani_lines = anim.FuncAnimation(fig, animate, frames, blit=True, fargs=(lines, xarray, yarrays, ax_ts), interval=myinterval)
     ani_image = anim.FuncAnimation(fig, updatefig, frames, blit=True, fargs=(im, vid, ax_video, pixelpos), interval=myinterval)
     #plt.tight_layout()
-    #ani_image.save(outfile, writer='ffmpeg', dpi=300)
-    ani_lines.save(outfile, extra_anim=[ani_image], writer='ffmpeg', dpi=300)
+    if ONLY_VIDEO:
+        ani_image.save(outfile, writer='ffmpeg', dpi=300)
+    else:
+        ani_lines.save(outfile, extra_anim=[ani_image], writer='ffmpeg', dpi=300)
 
 def respine(ax, interval, tickint, bottom):
     if interval is None:
@@ -170,7 +206,10 @@ def respine(ax, interval, tickint, bottom):
         ax.spines['left'].set_visible(False)
         sns.despine(ax=ax, left=True, bottom=bottom, trim=True)
     else:
-        ax.set_yticks(np.arange(interval[0], interval[1]+1,tickint))
+        if type(tickint) is list:
+            ax.set_yticks(tickint)
+        else:
+            ax.set_yticks(np.arange(interval[0], interval[1]+1,tickint))
         ax.set_ylim(interval)
         sns.despine(ax=ax, bottom=bottom, trim=True)
     return ax
@@ -209,21 +248,23 @@ if __name__ == '__main__':
     kinedf['min_patch'] = kinedf.loc[:,['dpatch_{}'.format(i) for i in range(11)]].min(axis=1)
     df = pd.concat([kinedf[['elapsed_time', 'sm_head_speed', 'angular_speed', 'min_patch']], ethodf[['etho', 'visit']]], axis=1)
     data_cols = ['visit', 'etho', 'angular_speed', 'sm_head_speed', 'min_patch']
-    fig, ax_video, ax_tseries, frames, xarray, yarrays, im, vid, lines = init_animation(df, time='elapsed_time', cols=data_cols, video=video_file, figsize=(16,6), interval=[START,END])
-    lines[0].set_color('#222222')
-    ax_tseries[0].set_xlabel('Time [s]')
-
-    ax_tseries[4] = respine(ax_tseries[4], [0,5], 1, True)
-    ax_tseries[3] = respine(ax_tseries[3], [0,8], 4, True)
-    ax_tseries[2] = respine(ax_tseries[2], [-600,600], 300, True)
-    ax_tseries[1] = respine(ax_tseries[1], None, 1, True)
-    ax_tseries[0] = respine(ax_tseries[0], None, 0.5, False)
-
-    ax_tseries[4].set_ylabel('Min. distance\nto patch [mm]')
-    ax_tseries[3].set_ylabel('Linear\nspeed [mm/s]')
-    ax_tseries[2].set_ylabel('Angular\nspeed [º/s]')
-    ax_tseries[1].set_ylabel('Ethogram', labelpad=40)
-    ax_tseries[0].set_ylabel('Visits', labelpad=40)
+    fig, ax_video, ax_tseries, frames, xarray, yarrays, im, vid, lines = init_animation(df, time='elapsed_time', cols=data_cols, video=video_file, figsize=(16,6), interval=[START,END], meta=meta)
+    if not ONLY_VIDEO:
+        lines[0].set_color('#222222')
+        ax_tseries[0].set_xlabel('Time [s]')
+        ax_tseries[4] = respine(ax_tseries[4], [0,10], 2.5, True)
+        ax_tseries[3] = respine(ax_tseries[3], [0,20], [0,2,5,10,15], True)
+        ax_tseries[2] = respine(ax_tseries[2], [-600,600], [-500,-125,0,125,500], True)
+        ax_tseries[1] = respine(ax_tseries[1], None, 1, True)
+        ax_tseries[0] = respine(ax_tseries[0], None, 0.5, False)
+        ax_tseries[4].set_ylabel('Min. distance\nto patch [mm]')
+        ax_tseries[3].set_ylabel('Linear\nspeed [mm/s]')
+        ax_tseries[2].set_ylabel('Angular\nspeed [º/s]')
+        ax_tseries[1].set_ylabel('Ethogram', labelpad=40)
+        ax_tseries[0].set_ylabel('Visits', labelpad=40)
+    if NO_ANNOS:
+        ax_tseries[1].set_visible(False)
+        ax_tseries[0].set_visible(False)
 
     pixelpos = [np.zeros(frames.shape), np.zeros(frames.shape), np.zeros(frames.shape), np.zeros(frames.shape), np.zeros(frames.shape)]
     scale, x0, y0 = meta['arena']['scale'], meta['arena']['x'], meta['arena']['y']
