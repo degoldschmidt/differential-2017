@@ -35,6 +35,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--force', action='store_true')
     parser.add_argument('-c', nargs='+', type=str)
+    parser.add_argument('-suf', type=str)
     OVERWRITE = parser.parse_args().force
 
     thisscript = os.path.basename(__file__).split('.')[0]
@@ -44,7 +45,7 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
-    conds = ["SAA", "AA", "S", "O"]
+    conds = ["SAA", "S", "AA", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
     colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
@@ -100,6 +101,14 @@ def main():
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax = plot_swarm(outdf, 'condition', 'ratio', sub, conds, mypal)
 
+
+        if sub == 'yeast':
+            l_c = 'S'
+        else:
+            l_c = 'AA'
+        stat, pval = ranksums(outdf.query('condition == "{}" and substrate == "{}"'.format(l_c, sub))['ratio'], outdf.query('condition == "O" and substrate == "{}"'.format(sub))['ratio'])
+        print(l_c, sub, pval)
+
         ### extra stuff
         ax.set_yticks([0,0.5,1])
         ax.set_ylim([-0.1,1.2])
@@ -110,6 +119,8 @@ def main():
         ### saving files
         plt.tight_layout()
         _file = os.path.join(outfolder, "{}_{}".format(_outfile, sub))
+        if parser.parse_args().suf is not None:
+            _file += '_'+parser.parse_args().suf
         plt.savefig(_file+'.pdf', dpi=300)
         plt.savefig(_file+'.png', dpi=300)
         plt.cla()

@@ -45,12 +45,14 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
+    ### conditions
     conds = ["SAA", "AA", "S", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
     colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
-    EthoTotals = {each_condition: {} for each_condition in conds}
+
+    ### input/output
     _in, _in2, _out = 'classifier', 'segments', 'plots'
     infolder = os.path.join(profile.out(), _in)
     in2folder = os.path.join(profile.out(), _in2)

@@ -71,9 +71,17 @@ def main():
             # arena plot
             ax = plot.arena(meta['arena'], meta['food_spots'], ax=ax)
             # trajectory plot
-            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 1, 2, 3, 6], ax=ax)
+            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 6], to_body=[3], ax=ax)
+            ax.plot(np.array(outdf['head_x'])[0], np.array(outdf['head_y'])[0], '#aaaaaa', marker='s', markersize=1)
+            intval = 200
+            timepoints = np.array(outdf['elapsed_time'])[intval::intval,0]
+            #ax.scatter(np.array(outdf['head_x'])[intval::intval], np.array(outdf['head_y'])[intval::intval], c=timepoints, cmap=plt.get_cmap('viridis'), marker='s', s=1, zorder=10)
+            ax.plot(np.array(outdf['head_x'])[-1], np.array(outdf['head_y'])[-1], 'k', marker='s', markersize=1)
             ax.add_artist(plt.Rectangle((30, 30), 2, 2, color = conds[meta['condition']]))
+            ax.text(30, 35, meta['condition'])
             ax.set_title('{}'.format(session.name), fontweight='bold', loc='left')
+            ax.set_xlim([2.5,27.5])
+            ax.set_ylim([-13.5,11.5])
             # output
             plt.tight_layout()
             _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))

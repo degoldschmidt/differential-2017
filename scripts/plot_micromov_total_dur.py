@@ -1,6 +1,6 @@
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
-from pytrack_analysis.viz import set_font, swarmbox
+import pytrack_analysis.plot as plot
 from pytrack_analysis import Multibench
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,14 +8,36 @@ import numpy as np
 import pandas as pd
 import os
 from scipy.stats import ranksums
+import argparse
 
-OVERWRITE = False
+def plot_swarm(data, x, y, sub, conds, mypal):
+    f, ax = plt.subplots(figsize=(1+2*len(conds)/4,2.5))
+    rdata = data.query('substrate == "{}"'.format(sub)).dropna()
+    querystr = ''
+    astr = ' or '
+    for condition in conds:
+        querystr += 'condition == "{}"'.format(condition)
+        querystr += astr
+    rdata = rdata.query(querystr[:-len(astr)])
+    # swarmbox
+    if len(conds) > 2:
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+    else:
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+    return ax
 
 def main():
     """
     --- general parameters
      *
     """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('-c', nargs='+', type=str)
+    parser.add_argument('-suf', type=str)
+    OVERWRITE = parser.parse_args().force
+
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
@@ -23,8 +45,12 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
-    conds = ["SAA", "AA", "S", "O"]
-    EthoTotals = {each_condition: {} for each_condition in conds}
+    conds = ["SAA", "S", "AA", "O"]
+    if parser.parse_args().c is not None:
+        conds = parser.parse_args().c
+    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    mypal = {condition: colormap[condition]  for condition in conds}
+
     _in, _in2, _out = 'classifier', 'segments', 'plots'
     infolder = os.path.join(profile.out(), _in)
     in2folder = os.path.join(profile.out(), _in2)
@@ -67,52 +93,42 @@ def main():
     f, ax = plt.subplots(figsize=(3,2.5))
 
     # swarmbox
-    ymax = [50, 16]
-    yt = [10, 4]
+    ymax = [50, 5] ### Vero: 50, 10
+    yt = [10, 1]
+    annos = [(55,.8), (10,0.1)] ### 55 -> 48 sucrose deprived
     for j, sub in enumerate(['yeast', 'sucrose']):
-        data = outdf.query('substrate == "{}"'.format(sub))
-        ax = swarmbox(x='condition', y='total_duration', data=data, palette={'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}, compare=[('SAA', ('AA', 'S', 'O'))])
+        ax = plot_swarm(outdf, 'condition', 'total_duration', sub, conds, mypal)
+        ### moving text
+        annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]
+        for each in annotations:
+            y = annos[j][0]
+            if 'ns' in each.get_text():
+                y += annos[j][1]
+            each.set_position((each.get_position()[0], y))
+
+        ###
+        X = outdf.query('condition == "SAA" and total_duration < 4').dropna()['total_duration']
+        Y = outdf.query('condition == "S" and total_duration < 4').dropna()['total_duration']
+        ax,_ = plot.annotate(0,1,0.5,[3],[3], stars=True, ax=ax, align='center', _h=0.05, _ht=0.1)
+
+        ### extra stuff
+        ax.set_ylim([-0.05*ymax[j],ymax[j]])
         ax.set_yticks(np.arange(0, ymax[j]+1, yt[j]))
         sns.despine(ax=ax, bottom=True, trim=True)
-        ax.set_xlabel('')
-        ax.set_ylabel('Total\nduration of\nmicromovements [min]')
+        ax.set_xlabel('pre-diet condition')
+        ax.set_ylabel('Total duration\nof {}\nmicromovements [min]'.format(sub))
+
+        ### saving files
         plt.tight_layout()
-        _file = os.path.join(outfolder, "{}_{}.pdf".format(_outfile, sub))
-        plt.savefig(_file, dpi=300)
+        _file = os.path.join(outfolder, "{}_{}".format(_outfile, sub))
+        if parser.parse_args().suf is not None:
+            _file += '_'+parser.parse_args().suf
+        plt.savefig(_file+'.pdf', dpi=300)
+        plt.savefig(_file+'.png', dpi=300)
         plt.cla()
 
     ### delete objects
     del profile
-
-    #         df['Ydur'], df['Sdur'] = df['frame_dt'], df['frame_dt']
-    #         df.loc[df['etho'] != 4, 'Ydur'] = 0
-    #         df.loc[df['etho'] != 5, 'Sdur'] = 0
-    #         EthoTotals['Yeast'][meta['condition']][each.name] = np.cumsum(np.array(df['Ydur']))[:108000]
-    #         EthoTotals['Sucrose'][meta['condition']][each.name] = np.cumsum(np.array(df['Sdur']))[:108000]
-    #         print(each.name)
-    #     except FileNotFoundError:
-    #         pass
-    #
-    # ### Plotting
-    # colors = ["#98c37e", "#5788e7", "#D66667", "#2b2b2b"]
-    # maxy = {'Yeast': 50, 'Sucrose': 25}
-    # tiky = {'Yeast': 10, 'Sucrose': 5}
-    # for each_substr in ['Yeast', 'Sucrose']:
-    #     f, axes = plt.subplots(1, 4, figsize=(8,3), dpi=400, sharey=True)
-    #     for i, each_cond in enumerate(conds):
-    #         _reduce=False
-    #         if i>0:
-    #             _reduce=True
-    #         df = pd.DataFrame(EthoTotals[each_substr][each_cond])
-    #         axes[i] = plot_cumulatives(df, color=colors[i], ax=axes[i], title=each_cond, tiky=tiky[each_substr], maxy=maxy[each_substr], reduce=_reduce)
-    #         f.suptitle('{}'.format(each_substr), fontsize=10, fontweight='bold', x=0.05, y=0.98, horizontalalignment='left')
-    #     ### Saving to file
-    #     plt.subplots_adjust(top=0.8)
-    #     plt.tight_layout()
-    #     _file = os.path.join(profile.out(), 'plots', 'cumsum_etho_{}.png'.format(each_substr))
-    #     print(_file)
-    #     plt.savefig(_file, dpi=600)
-    #     plt.cla()
 
 if __name__ == '__main__':
     # runs as benchmark test

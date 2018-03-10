@@ -1,119 +1,88 @@
-import os
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
-import pytrack_analysis.preprocessing as prp
-from pytrack_analysis import Kinematics
+import pytrack_analysis.plot as plot
 from pytrack_analysis import Multibench
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
+import os
+from scipy.stats import ranksums
+import argparse
 
-import matplotlib.pyplot as plt
-
-
-def plot_arena(arena=None, spots=None, condition=None, ax=None):
-    spot_colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
-    cond_colors = {'SAA': '#b6d7a8', 'AA': '#A4C2F4', 'S': '#EA9999', 'O': '#CCCCCC'}
-    if ax is None:
-        ax = plt.gca()
-    ### artists
-    if arena is not None:
-        ax.set_xlim([-1.1*arena.ro, 1.1*arena.ro])
-        ax.set_ylim([-1.1*arena.ro, 1.1*arena.ro])
-        arena_border = plt.Circle((0, 0), arena.rr, color='k', fill=False)
-        ax.add_artist(arena_border)
-        outer_arena_border = plt.Circle((0, 0), arena.ro, color='#aaaaaa', fill=False)
-        ax.add_artist(outer_arena_border)
-        ax.plot(0, 0, 'o', color='black', markersize=2)
-    if spots is not None:
-        for each_spot in spots:
-            substr = each_spot.substrate
-            spot = plt.Circle((each_spot.rx, each_spot.ry), each_spot.rr, color=spot_colors[substr], alpha=0.5)
-            ax.add_artist(spot)
-    if condition is not None:
-        if condition in cond_colors.keys():
-            spot = plt.Rectangle((-arena.ro, arena.ro-2), 5, 5, color=cond_colors[condition])
-            ax.add_artist(spot)
-    ax.set_aspect("equal")
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    ax.axis('off')
-    return ax
-
-def traj_plot(_data, _file, arena=None, time=None, title=None):
-    f, ax = plt.subplots(1, figsize=(8,8), dpi=600)
-    arena = data.arenas[fly]
-    df = data.raw_data[fly]
-    if time is None:
-        start, end = df.index[0], df.index[-1]
-    else:
-        start, end = time
-    ax = plot_arena(arena=arena, spots=arena.spots, condition=data.condition[fly], ax=ax)
-    x = df.loc[start:end, 'body_x']
-    y = df.loc[start:end, 'body_y']
-    hx = df.loc[start:end, 'head_x']
-    hy = df.loc[start:end, 'head_y']
-    tx = df.loc[start:end, 'tail_x']
-    ty = df.loc[start:end, 'tail_y']
-    if only is None or only == 'body':
-        ax.plot(x/scale, y/scale, c='k')
-    if only is None or only == 'tail':
-        ax.scatter(tx/scale, ty/scale, c='b', s=.25)
-    if only is None or only == 'head':
-        ax.scatter(hx/scale, hy/scale, c='r', s=.25)
-    fly += 1
-    plt.tight_layout()
-    f.savefig(_file, dpi=600)
-
-def ts_plot(_data, _file):
-    f, axes = plt.subplots(8, figsize=(16,8), sharex=True)
-
-    _data['cumsum_dist'] = np.cumsum(_data['displacements'])
-    y = ['cumsum_dist', 'head_speed', 'body_speed', 'angle', 'angular', 'dcenter', 'dpatch', 'or']
-    ylabels = ['cumul.\ndist.\n[mm]', 'head\nspeed\n[mm/s]', 'body\nspeed\n[mm/s]', 'angle\n[deg]', 'turn\nrate\n[deg/s]', 'dist.\n[mm]', 'dist.\n[mm]', 'length\n[mm]']
-    yeast, sucrose = 6*['#ffc04c'],6*['#4c8bff']
-    ycolors = [['k'], ['k', 'b', 'r'], ['k', 'b', 'r'], ['#414141', '#8a8a8a'],['#4949fb'], ['#af61f4'], yeast+sucrose, ['g', 'm']]
-
-    for i,ax in enumerate(axes):
-        matches = [each for each in _data.columns if y[i] in each]
-        for j, each in enumerate(matches):
-            ydata = _data[each]
-            if y[i] == 'dpatch':
-                ax.plot(ydata, c=ycolors[i][j], label=each, lw=1, alpha=0.9)
-            else:
-                ax.plot(ydata, c=ycolors[i][j], label=each, lw=.5)
-                if len(matches) > 1:
-                    ax.legend(fontsize=6)
-        ax.set_ylabel(ylabels[i], labelpad=20, rotation_mode='anchor', rotation=0, fontsize=8)
-        ax.set_xlim([_data.index[0], _data.index[-1]])
-        if y[i] == 'dpatch':
-            ax.set_ylim([-0.1, 5.])
-        if i == len(axes)-1:
-            ax.set_xlabel('frame #')
-    plt.tight_layout()
-    plt.savefig(_file, dpi=600)
-    plt.clf()
-    plt.close()
 
 def main():
-    # filename of this script
-    thisscript = os.path.basename(__file__).split('.')[0]
-    profile = get_profile('DIFF', 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db()) # database from file
+    """
+    --- general parameters
+     *
+    """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-ses', action="store", dest="session", type=int)
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('-sf', action="store", dest="startfr", type=int)
+    parser.add_argument('-ef', action="store", dest="endfr", type=int)
+    OVERWRITE = parser.parse_args().force
+    SESSION = parser.parse_args().session
+    START = parser.parse_args().startfr
+    END = parser.parse_args().endfr
 
+    thisscript = os.path.basename(__file__).split('.')[0]
+    experiment = 'DIFF'
+    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    db = Experiment(profile.db())
+
+    conds = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
     in_suffix  =  ['kinematics', 'classifier']
     out_suffix =  'plots'
+    infolder = [os.path.join(profile.out(), suf) for suf in in_suffix]
+    outfolder = os.path.join(profile.out(), out_suffix)
+    outdf = {'session': [], 'condition': [], 'ratio': []}
+    _outfile = 'trajectory'
+    if SESSION is None: listsession = db.sessions
+    else: listsession = db.sessions[SESSION:SESSION+1]
+    for session in listsession:
+        noPlot = False
+        meta = session.load_meta()
+        if START is None: START = meta['video']['first_frame']
+        if END is None: END = meta['video']['last_frame']
+        print('First frame: {}, last frame: {}'.format(START, END))
+        hook_file = os.path.join(outfolder, "{}_{}.csv".format(_outfile, session.name))
+        ### take data from input files or hook
+        if os.path.isfile(hook_file) and not OVERWRITE:
+            print('Found data hook for session {}'.format(session.name))
+            outdf = pd.read_csv(hook_file, index_col='id')
+        else:
+            print('Compute data for session {}'.format(session.name))
+            ### Loading data
+            try:
+                csv_file = [os.path.join(infolder[j], '{}_{}.csv'.format(session.name, suf)) for j, suf in enumerate(in_suffix)]
+                dfs = [pd.read_csv(each_file, index_col='frame') for each_file in csv_file]
+                outdf = pd.concat(dfs, axis=1).loc[START:END]
+                ### save plotted data
+                outdf.to_csv(hook_file, index_label='id')
+            except FileNotFoundError:
+                print(csv_file[0] + ' not found!')
+                noPlot = True
 
-    ### GO THROUGH SESSIONS
-    for each in db.sessions[:1]:
-        print(each.name)
-        df_raw, meta = each.load(VERBOSE=False)
-        csv_file = os.path.join(profile.out(), in_suffix[0],  each.name+'_kinematics.csv')
-        df = pd.read_csv(csv_file, index_col='frame')
-        df['major'] = df_raw['major']
-        df['minor'] = df_raw['minor']
-        ts_plot(df, os.path.join(profile.out(),each.name+'_ts.pdf'))
-        #traj_plot(df, os.path.join(profile.out(),each.name+'_traj.pdf'), arena=meta['arena'], )
+        #### Plotting
+        if not noPlot:
+            f, axes = plt.subplots(5, figsize=(4,4))
+
+            # ROW 0 (BOTTOM)
+
+            # output
+            plt.tight_layout()
+            _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))
+            plt.savefig(_file+'.pdf', dpi=300)
+            #plt.savefig(_file+'.svg', dpi=300)
+            plt.savefig(_file+'.png', dpi=300)
+            plt.cla()
+            plt.clf()
+            plt.close()
+
+    ### delete objects
+    del profile
 
 if __name__ == '__main__':
     # runs as benchmark test
