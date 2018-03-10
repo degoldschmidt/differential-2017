@@ -4,21 +4,21 @@ Demo Animation
 ===============
 """
 from pytrack_analysis.profile import get_profile
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-import matplotlib.animation as anim
 import seaborn as sns
 import numpy as np
 import imageio
 import pandas as pd
 import os
 
+from pytrack_analysis.plot import set_font, swarmbox
 from pytrack_analysis.database import Experiment
 import pytrack_analysis.preprocessing as prp
 from pytrack_analysis import Classifier
 from pytrack_analysis import Multibench
-from pytrack_analysis.viz import set_font, swarmbox
 
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import matplotlib.animation as anim
 import argparse
 
 ONLY_VIDEO = False
@@ -239,7 +239,12 @@ def main():
     db = Experiment(profile.db())
     session = db.sessions[SESSION]
     meta = session.load_meta(VERBOSE=False)
-    video_file = meta['video']['file']
+    if os.name == 'posix':
+        _file = meta['video']['file'].split('\\')[-1]
+        video_file = os.path.join("/Volumes/DATA_BACKUP/data/tracking/all_videos", _file)
+        print("MacOSX:", video_file)
+    else:
+        video_file = meta['video']['file']
     first = meta['video']['first_frame']
     csv_file = os.path.join(infolder,  '{}_{}.csv'.format(session.name, _in))
     csv_file2 = os.path.join(infolder2,  '{}_{}.csv'.format(session.name, _in2))
