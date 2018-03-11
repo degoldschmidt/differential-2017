@@ -73,11 +73,12 @@ def main():
             for i in [1,3,9]:
                 x,y = meta['food_spots'][i]['x'], meta['food_spots'][i]['y']
                 ax.add_artist(plt.Circle((x,y), 2.5, ls='dashed', color='#818181', fill=False, lw=1.5))
+                ax.add_artist(plt.Circle((x,y), 3, ls='dotted', color='#818181', fill=False, lw=1.5))
                 if i == 1:
                     ax.add_artist(plt.Circle((x,y), 5, ls='dotted', color='#818181', fill=False, lw=1))
 
             # trajectory plot
-            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 6], to_body=[3], size=10, ax=ax)
+            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 6], to_body=[3], size=12, ax=ax)
             ax.plot(np.array(outdf['head_x'])[0], np.array(outdf['head_y'])[0], '#aaaaaa', marker='s', markersize=1)
             intval = 200
             timepoints = np.array(outdf['elapsed_time'])[intval::intval,0]
@@ -88,6 +89,8 @@ def main():
             #ax.set_title('{}'.format(session.name), fontweight='bold', loc='left')
             ax.set_xlim([2.5,27.5])
             ax.set_ylim([-13.5,11.5])
+            ax.set_xlim([0.5,15.5])
+            ax.set_ylim([-3.,12.])
             # output
             plt.tight_layout()
             _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))

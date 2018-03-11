@@ -33,12 +33,12 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
-    conds = ["SAA", "AA", "S", "O"]
+    conds = ["SAA", "S", "AA", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
     colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
-    EthoTotals = {each_condition: {} for each_condition in conds}
+
     _in, _in2, _out = 'classifier', 'segments', 'plots'
     infolder = os.path.join(profile.out(), _in)
     in2folder = os.path.join(profile.out(), _in2)
@@ -47,7 +47,7 @@ def main():
 
     _outfile = 'sort_ethogram'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
-    f, axes = plt.subplots(ncols=len(conds), figsize=(len(conds)*3,3.8), sharey=True)
+    f, axes = plt.subplots(ncols=len(conds), figsize=(len(conds)*2.5,3.), sharey=True)
     ethocolor = {4: "#ffc04c", 5: "#4c8bff", 'NA': '#e2e2e2'}
     totaldf = { 'session': [], 'condition': [], 'totalY': [], 'totalS': [], 'sortbyY': [] }
     if os.path.isfile(hook_file) and not OVERWRITE:
@@ -126,7 +126,7 @@ def main():
     ### saving files
     plt.tight_layout(rect=[0, -0.03, 1, 0.95])
     _file = os.path.join(outfolder, "{}".format(_outfile))
-    plt.savefig(_file+'.pdf', dpi=300)
+    #plt.savefig(_file+'.pdf', dpi=300)
     plt.savefig(_file+'.png', dpi=300)
     plt.cla()
 
