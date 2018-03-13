@@ -22,7 +22,7 @@ import matplotlib.animation as anim
 import argparse
 
 ONLY_VIDEO = False
-ONLY_TRAJ = True
+ONLY_TRAJ = False
 NO_ANNOS = False
 
 def unflatten(l):
@@ -57,12 +57,12 @@ palette = {    -1: '#ff00fc',
                 1: '#c97aaa',
                 2: '#000000',
                 3: '#30b050',
-                4: '#ff7f00',
-                5: '#1f78b4',
+                4: '#ffc04c',
+                5: '#4c8bff',
                 6: '#ff1100'}
 palette2 ={     0: '#ffffff',
-                1: '#ff7f00',
-                2: '#1f78b4'}
+                1: '#ffc04c',
+                2: '#4c8bff'}
 # animate time series
 def animate(frame, *args):
     lines = args[0]
