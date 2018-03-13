@@ -1,6 +1,6 @@
 from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
-from pytrack_analysis.viz import set_font, swarmbox
+from pytrack_analysis.plot import set_font, swarmbox
 from pytrack_analysis import Multibench
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import os
 from scipy.stats import ranksums
+import argparse
 
 OVERWRITE = False
 onlyAA = False
@@ -17,6 +18,12 @@ def main():
     --- general parameters
      *
     """
+    ### CLI arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('-c', nargs='+', type=str)
+    OVERWRITE = parser.parse_args().force
+
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
     profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
@@ -24,7 +31,11 @@ def main():
     sessions = db.sessions
     n_ses = len(sessions)
 
-    conds = ["SAA", "AA", "S", "O"]
+    conds = ["SAA", "S", "AA", "O"]
+    if parser.parse_args().c is not None:
+        conds = parser.parse_args().c
+    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    mypal = {condition: colormap[condition]  for condition in conds}
     substrates = ['yeast', 'sucrose']
     ### inputs
     _in = ['kinematics', 'classifier']
@@ -115,15 +126,30 @@ def main():
     # swarmbox
     for j, each in enumerate(substrates):
         if onlyAA: width = 6
-        else: width = 9
+        else: width = 2.*len(conds)+1
         f, axes = plt.subplots(1,3,figsize=(width,2.5))
-        data = outdf.query('substrate == "{}" and total > 6'.format(each))
-        print(data)
+        data = outdf.query('substrate == "{}" and total > 4'.format(each))
+        querystr = ''
+        astr = ' or '
+        for condition in conds:
+            querystr += 'condition == "{}"'.format(condition)
+            querystr += astr
+        rdata = data.query(querystr[:-len(astr)])
         patchid = ['far_patch', 'near_patch', 'same_patch']
         patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each)]
         for i, ax in enumerate(axes):
-            if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=data, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
-            else: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=data, order=['SAA', 'AA', 'S', 'O'], palette={'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}, compare=[('SAA', ('AA', 'S', 'O'))])
+            print(conds)
+            if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
+            else:
+                if len(conds) > 2:
+                    ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+                else:
+                    ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+
+            annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
+            for an in annotations:
+                an.set_position((an.get_position()[0], an.get_position()[1]+0.09))
+            print(annotations)
             ax.set_yticks([0,0.5,1])
             ax.set_ylim([-.05, 1.25])
             sns.despine(ax=ax, bottom=True, trim=True)
@@ -135,7 +161,7 @@ def main():
         plt.tight_layout()
         suffix = ''
         if onlyAA: suffix= '_aa'
-        _file = os.path.join(outfolder, "{}_{}.pdf".format(_outfile+suffix, each))
+        _file = os.path.join(outfolder, "{}_{}.png".format(_outfile+suffix, each))
         plt.savefig(_file, dpi=300)
         plt.cla()
         plt.clf()

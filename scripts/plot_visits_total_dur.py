@@ -90,9 +90,9 @@ def main():
     print(outdf)
 
     #### Plotting
-    my_ylims = [60, 25]
+    my_ylims = [60, 20]
     annos = [(58,1), (21,0.4)]
-    my_yticks = [20, 10]
+    my_yticks = [15, 5]
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax = plot_swarm(outdf, 'condition', 'duration', sub, conds, mypal)
         annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]

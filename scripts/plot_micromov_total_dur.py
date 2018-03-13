@@ -24,7 +24,16 @@ def plot_swarm(data, x, y, sub, conds, mypal):
         ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
     else:
         ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
-    return ax
+
+    if sub == 'yeast':
+        stat, pval = ranksums(rdata.query('condition == "S"')['total_duration'], rdata.query('condition == "O"')['total_duration'])
+
+        print(pval, 'S')
+    else:
+        stat, pval = ranksums(rdata.query('condition == "AA"')['total_duration'], rdata.query('condition == "O"')['total_duration'])
+        print(pval, 'AA')
+
+    return ax, pval
 
 def main():
     """
@@ -93,11 +102,11 @@ def main():
     f, ax = plt.subplots(figsize=(3,2.5))
 
     # swarmbox
-    ymax = [50, 5] ### Vero: 50, 10
-    yt = [10, 1]
-    annos = [(55,.8), (10,0.1)] ### 55 -> 48 sucrose deprived
+    ymax = [60, 20]#[50, 5] ### Vero: 50, 10
+    yt = [15, 5]
+    annos = [(55,.8), (18.5,0.1)] ### 55 -> 48 sucrose deprived
     for j, sub in enumerate(['yeast', 'sucrose']):
-        ax = plot_swarm(outdf, 'condition', 'total_duration', sub, conds, mypal)
+        ax, pval = plot_swarm(outdf, 'condition', 'total_duration', sub, conds, mypal)
         ### moving text
         annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]
         for each in annotations:
@@ -107,9 +116,12 @@ def main():
             each.set_position((each.get_position()[0], y))
 
         ###
-        X = outdf.query('condition == "SAA" and total_duration < 4').dropna()['total_duration']
-        Y = outdf.query('condition == "S" and total_duration < 4').dropna()['total_duration']
-        ax,_ = plot.annotate(0,1,0.5,[3],[3], stars=True, ax=ax, align='center', _h=0.05, _ht=0.1)
+        #X = outdf.query('condition == "SAA" and total_duration < 4').dropna()['total_duration']
+        #Y = outdf.query('condition == "S" and total_duration < 4').dropna()['total_duration']
+        if sub == 'yeast':
+            ax,_ = plot.annotate(1,3,pval,[40],[40], stars=True, ax=ax, align='center', _h=0.05, _ht=1.2)
+        else:
+            ax,_ = plot.annotate(2,3,pval,[12],[12], stars=True, ax=ax, align='center', _h=0.05, _ht=0.1)
 
         ### extra stuff
         ax.set_ylim([-0.05*ymax[j],ymax[j]])
@@ -123,7 +135,7 @@ def main():
         _file = os.path.join(outfolder, "{}_{}".format(_outfile, sub))
         if parser.parse_args().suf is not None:
             _file += '_'+parser.parse_args().suf
-        plt.savefig(_file+'.pdf', dpi=300)
+        #plt.savefig(_file+'.pdf', dpi=300)
         plt.savefig(_file+'.png', dpi=300)
         plt.cla()
 
