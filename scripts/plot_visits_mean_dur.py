@@ -12,7 +12,7 @@ from scipy.stats import ranksums
 import argparse
 
 def plot_swarm(data, x, y, sub, conds, mypal):
-    f, ax = plt.subplots(figsize=(3,2.5))
+    f, ax = plt.subplots(figsize=(1+2*len(conds)/4,2.5))
     rdata = data.query('substrate == "{}"'.format(sub)).dropna()
     querystr = ''
     astr = ' or '
@@ -22,10 +22,10 @@ def plot_swarm(data, x, y, sub, conds, mypal):
     rdata = rdata.query(querystr[:-len(astr)])
     # swarmbox
     if len(conds) > 2:
-        #ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
         ###violinplot
-        ax = sns.violinplot(x=x, y=y, data=rdata, order=conds, palette=mypal, cut=0, linewidth=.5, ax=ax)
-        ax.tick_params('x', length=0, width=0, which='major')
+        #ax = sns.violinplot(x=x, y=y, data=rdata, order=conds, palette=mypal, cut=0, linewidth=.5, ax=ax)
+        #ax.tick_params('x', length=0, width=0, which='major')
     else:
         ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
     return ax
@@ -90,8 +90,8 @@ def main():
     print(outdf)
 
     #### Plotting
-    my_ylims = [5, 2]
-    annos = [(13.,0.2), (2.5,0.05)]
+    my_ylims = [8, 3]
+    annos = [(7.,0.2), (2.5,0.05)]
     my_yticks = [2, 1]
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax = plot_swarm(outdf, 'condition', 'duration', sub, conds, mypal)
@@ -102,6 +102,9 @@ def main():
                 y += annos[j][1]
             each.set_position((each.get_position()[0], y))
         print(annotations)
+        ax,_ = plot.annotate(0,1,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
+        ax,_ = plot.annotate(0,2,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
+        ax,_ = plot.annotate(0,3,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
         ### extra stuff
         ax.set_yticks(np.arange(0,my_ylims[j]+1,my_yticks[j]))
         ax.set_ylim([-0.1*my_ylims[j],1.1*my_ylims[j]])
@@ -112,8 +115,8 @@ def main():
         ### saving files
         plt.tight_layout()
         _file = os.path.join(outfolder, "{}_{}".format(_outfile, sub))
-        plt.savefig(_file+'_violin.pdf', dpi=300)
-        plt.savefig(_file+'_violin.png', dpi=300)
+        #plt.savefig(_file+'_violin.pdf', dpi=300)
+        plt.savefig(_file+'.png', dpi=300)
         plt.cla()
 
     ### delete objects
