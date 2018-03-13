@@ -10,8 +10,7 @@ import os
 from scipy.stats import ranksums
 import argparse
 
-def plot_swarm(data, x, y, sub, conds, mypal, ssample, times):
-    f, ax = plt.subplots(figsize=(0.5*len(conds)+1,2.5))
+def reduce_data(data, sub, conds):
     rdata = data.query('substrate == "{}"'.format(sub)).dropna()
     querystr = ''
     astr = ' or '
@@ -19,61 +18,59 @@ def plot_swarm(data, x, y, sub, conds, mypal, ssample, times):
         querystr += 'condition == "{}"'.format(condition)
         querystr += astr
     rdata = rdata.query(querystr[:-len(astr)])
+    return rdata
 
-    if times is not None:
-        pvaldf = {'condition': [], 'pval': []}
-        for t in range(times):
-            if t%100 == 0:
-                print(t)
-            if ssample is not None:
-                ssdata = pd.DataFrame(columns=rdata.columns)
-                for condition in conds:
-                    M = len(rdata.query('condition == "{}"'.format(condition)).index)
-                    seeds = np.random.randint(0,high=10000000)
-                    #print(seeds)
-                    np.random.seed(seeds)
-                    random_choices = np.random.choice(M,ssample)
-                    #print(random_choices)
-                    samples = rdata.query('condition == "{}"'.format(condition)).iloc[random_choices]
-                    ssdata = ssdata.append(samples)
+def bootstrap_data(data, x, y, sub, conds, ssample, times):
+    rdata = reduce_data(data, sub, conds)
+    pvaldf = {'condition': [], 'pval': []}
+    for t in range(times):
+        if t%100 == 0:
+            print(t)
+        if ssample is not None:
+            ssdata = pd.DataFrame(columns=rdata.columns)
+            for condition in conds:
+                M = len(rdata.query('condition == "{}"'.format(condition)).index)
+                seeds = np.random.randint(0,high=10000000)
+                #print(seeds)
+                np.random.seed(seeds)
+                random_choices = np.random.choice(M,ssample)
+                #print(random_choices)
+                samples = rdata.query('condition == "{}"'.format(condition)).iloc[random_choices]
+                ssdata = ssdata.append(samples)
 
-            for each in conds[1:]:
-                X, Y = ssdata.query('condition == "{}"'.format(conds[0]))[y], ssdata.query('condition == "{}"'.format(each))[y]
-                #print(X, Y)
-                _, pval = ranksums(np.array(X),np.array(Y))
-                if sub == 'yeast':
-                    if each == 'S' or each == 'O':
-                        pvaldf['condition'].append(each)
-                        pvaldf['pval'].append(pval)
-                else:
-                    if each == 'AA' or each == 'O':
-                        pvaldf['condition'].append(each)
-                        pvaldf['pval'].append(pval)
-
-        f, ax = plt.subplots(figsize=(4,2))
-        pvaldf = pd.DataFrame(pvaldf)
-        if sub == 'yeast':
-            conds = ['S', 'O']
-            data1 = pvaldf.query('condition == "S"')['pval']
-            data2 = pvaldf.query('condition == "O"')['pval']
-        else:
-            conds = ['AA', 'O']
-            data1 = pvaldf.query('condition == "AA"')['pval']
-            data2 = pvaldf.query('condition == "O"')['pval']
-        #print(len(data1.index), len(data2.index))
-        ax.hist(data1, bins=np.logspace(np.log10(0.0000000001),np.log10(10.0), 20), density=False, color=mypal[conds[0]], alpha=0.5)
-        ax.hist(data2, bins=np.logspace(np.log10(0.0000000001),np.log10(10.0), 20), density=False, color=mypal[conds[1]], alpha=0.5)
-        ax.vlines(np.median(data1), 0, ax.get_ylim()[1], color=mypal[conds[0]], lw=1, linestyles='dashed')
-        ax.vlines(np.median(data2), 0, ax.get_ylim()[1], color=mypal[conds[1]], lw=1, linestyles='dashed')
-        #print(data1, data2)
-        print(np.median(data1), np.median(data2))
-        ax.set_xscale("log")
-        ax.set_xlabel('p-value (log-scale)')
-        ax.set_ylabel('counts')
-        #ax = sns.violinplot(x=x, y='pval', data=pvaldf, palette=mypal, cut=0)
+        for each in conds[1:]:
+            X, Y = ssdata.query('condition == "{}"'.format(conds[0]))[y], ssdata.query('condition == "{}"'.format(each))[y]
+            _, pval = ranksums(np.array(X),np.array(Y))
+            if sub == 'yeast':
+                if each == 'S' or each == 'O':
+                    pvaldf['condition'].append(each)
+                    pvaldf['pval'].append(pval)
+            else:
+                if each == 'AA' or each == 'O':
+                    pvaldf['condition'].append(each)
+                    pvaldf['pval'].append(pval)
+    pvaldf = pd.DataFrame(pvaldf)
+    return pvaldf
 
 
+def plot_pval_distr(data_list, color_list):
+    f, ax = plt.subplots(figsize=(4,2))
+    for data, color in zip(data_list, color_list):
+        ax.hist(data, bins=np.logspace(np.log10(0.0000000001),np.log10(10.0), 20), density=False, color=color, alpha=0.5)
+    ymax = ax.get_ylim()[1]
+    for data, color in zip(data_list, color_list):
+        ax.vlines(np.median(data), 0, ymax, color=color, lw=1, linestyles='dashed')
+        print(np.median(data))
+    ax.set_ylim([0, ymax])
+    ax.set_xscale("log")
+    ax.set_xlabel('p-value (log-scale)')
+    ax.set_ylabel('counts')
+    return ax
 
+
+def plot_swarm(data, x, y, sub, conds, mypal, ssample, times):
+    f, ax = plt.subplots(figsize=(0.5*len(conds)+1,2.5))
+    rdata = reduce_data(data, sub, conds)
     # swarmbox
     if times is None:
         if len(conds) > 2:
@@ -92,11 +89,7 @@ def main():
     parser.add_argument('--force', action='store_true')
     parser.add_argument('-c', nargs='+', type=str)
     parser.add_argument('-suf', type=str)
-    parser.add_argument('-ss', type=int)
-    parser.add_argument('-times', type=int)
     OVERWRITE = parser.parse_args().force
-    subsample = parser.parse_args().ss
-    TIMES = parser.parse_args().times
 
     thisscript = os.path.basename(__file__).split('.')[0]
     experiment = 'DIFF'
@@ -160,37 +153,33 @@ def main():
     #### Plotting
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax = plot_swarm(outdf, 'condition', 'ratio', sub, conds, mypal, subsample, TIMES)
-        ### moving text
-        if TIMES is None:
-            annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
-            for each in annotations:
-                each.set_position((each.get_position()[0], each.get_position()[1] + 0.1))
+        annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
+        for each in annotations:
+            each.set_position((each.get_position()[0], each.get_position()[1] + 0.1))
 
 
+        if sub == 'yeast':
+            l_c = 'S'
+        else:
+            l_c = 'AA'
+        stat, pval = ranksums(outdf.query('condition == "{}" and substrate == "{}"'.format(l_c, sub))['ratio'], outdf.query('condition == "O" and substrate == "{}"'.format(sub))['ratio'])
+        print(l_c, sub, pval)
+        if len(conds) > 2:
             if sub == 'yeast':
-                l_c = 'S'
+                ax,_ = plot.annotate(1,3,pval,[0.88],[0.88], stars=True, ax=ax, align='center', _h=0.0, _ht=0.02)
             else:
-                l_c = 'AA'
-            stat, pval = ranksums(outdf.query('condition == "{}" and substrate == "{}"'.format(l_c, sub))['ratio'], outdf.query('condition == "O" and substrate == "{}"'.format(sub))['ratio'])
-            print(l_c, sub, pval)
-            if len(conds) > 2:
-                if sub == 'yeast':
-                    ax,_ = plot.annotate(1,3,pval,[0.88],[0.88], stars=True, ax=ax, align='center', _h=0.0, _ht=0.02)
-                else:
-                    ax,_ = plot.annotate(2,3,pval,[0.75],[0.75], stars=True, ax=ax, align='center', _h=0.0, _ht=0.05)
+                ax,_ = plot.annotate(2,3,pval,[0.75],[0.75], stars=True, ax=ax, align='center', _h=0.0, _ht=0.05)
 
-            ### extra stuff
-            ax.set_yticks([0,0.5,1])
-            ax.set_ylim([-0.1,1.2])
-            sns.despine(ax=ax, bottom=True, trim=True)
-            ax.set_xlabel('pre-diet condition')
-            ax.set_ylabel('Probability of\nstopping at a\n{} patch'.format(sub))
+        ### extra stuff
+        ax.set_yticks([0,0.5,1])
+        ax.set_ylim([-0.1,1.2])
+        sns.despine(ax=ax, bottom=True, trim=True)
+        ax.set_xlabel('pre-diet condition')
+        ax.set_ylabel('Probability of\nstopping at a\n{} patch'.format(sub))
 
         ### saving files
         plt.tight_layout()
         _file = os.path.join(outfolder, "{}_{}".format(_outfile, sub))
-        if TIMES is not None:
-            _file += '_pvals'
         if parser.parse_args().suf is not None:
             _file += '_'+parser.parse_args().suf
         #plt.savefig(_file+'.pdf', dpi=300)

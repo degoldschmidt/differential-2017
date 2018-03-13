@@ -73,15 +73,17 @@ def main():
 
 
 
-    axes[0].set_ylabel('Mean total duration\nsucrose micromovements [min]')
+    axes[0].set_ylabel('Mean total duration\nmicromovements [min]')
     f.suptitle("pre-diet condition:", x=0.1, y=0.98)
+    raxes = []
+    allmax = 0
     for i, ax in enumerate(axes):
         print(i)
         window = 5.
         time = np.arange(0, 60.+.05, 1.)
         binw = 1.
         timebins = np.arange(0, 60.+.05, binw)
-        for state in [5]:
+        for state in [4, 5]:
             data = np.array(dfs[conds[i]].query('etho == {}'.format(state))['elapsed_time'])/60.
             timedata = np.array(dfs[conds[i]].query('etho == {}'.format(state))['frame_dt'])/60.
             print(len(data))
@@ -94,7 +96,10 @@ def main():
                     print(mask)
                 meandata[ti] = np.sum(timedata[mask])/counts[conds[i]]
             print(time, meandata)
-            ax.plot(time, meandata, alpha=0.5, color=ethocolor[state])
+            if state == 4:
+                ax.plot(time, meandata, alpha=0.5, color=ethocolor[state])
+            if state == 5:
+                ax.plot(time, meandata, alpha=0.5, color=ethocolor[state])
         #data = np.array(dfs[conds[i]].query('etho == 5')['elapsed_time'])/60.
         #ax.hist(data, bins=np.arange(0,60.5,0.5), alpha=0.5, histtype='stepfilled', color=ethocolor[5], edgecolor='none')
         ax.set_title("{} ($n$={})".format(conds[i], counts[conds[i]]))
@@ -103,12 +108,22 @@ def main():
         ax.set_xlim([0,60])
         #ax.set_yticks(np.arange(0,3,1))
         #ax.set_ylim([0.,3.])
-        ax.set_yticks(np.arange(0,1,.25))
-        ax.set_ylim([0.,1.])
+        ax.set_yticks(np.arange(0,2,.5))
+        ax.set_ylim([0.,2.])
         sns.despine(ax=ax, trim=True)
         if i > 0:
             ax.get_yaxis().set_visible(False)
             ax.spines['left'].set_visible(False)
+        """
+        if i == 3:
+            ax2 = ax.twinx()
+            ax2.set_ylim([0, 0.75])
+            ax2.get_yaxis().set_visible(False)
+            ax2.spines['left'].set_visible(False)
+        """
+
+    #for ax2 in raxes:
+        #ax2.set_ylim([0, 1.1*allmax])
 
 
     ### saving files
