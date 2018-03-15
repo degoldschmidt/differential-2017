@@ -236,7 +236,7 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
 
     return fig, ax_video, ax_tseries, T, xarray, yarrays, im, vid, lines, ucols
 
-def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts, pixelpos, factor=1, cols=None, outfile="out.mp4"):
+def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts, pixelpos, factor=1, cols=None, outfile="out"):
     myinterval = 1000./(30*factor)
     print("Interval between frame: {}".format(myinterval))
     if not ONLY_VIDEO:
@@ -245,9 +245,11 @@ def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts,
     #plt.tight_layout()
     print(fig.get_size_inches()*fig.dpi)
     if ONLY_VIDEO:
-        ani_image.save(outfile, writer='ffmpeg', dpi=180)
+        ani_image.save(outfile+'.gif', dpi=89, writer='imagemagick')
+        #ani_image.save(outfile+'.mp4', writer='ffmpeg', dpi=180)
     else:
-        ani_lines.save(outfile, extra_anim=[ani_image], writer='ffmpeg', dpi=180)
+        ani_lines.save(outfile+'.gif', dpi=89, writer='imagemagick')
+        #ani_lines.save(outfile+'.mp4', extra_anim=[ani_image], writer='ffmpeg', dpi=180)
 
 def respine(ax, interval, tickint, bottom):
     if interval is None:
@@ -341,7 +343,7 @@ def main():
     pixelpos[4] = (-scale*np.array(kinedf['body_y']) + y0).astype(int)
 
     ### save animation to file
-    _file = os.path.join(outfolder, "{}_{}.mp4".format(_outfile, session.name))
+    _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))
     run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_tseries, pixelpos, cols=ucols, outfile=_file)
     ### delete objects
     del profile
