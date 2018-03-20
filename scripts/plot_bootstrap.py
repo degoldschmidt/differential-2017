@@ -57,7 +57,7 @@ def bootstrap_data(data, y, sub, conds, ssample, times):
 def plot_pval_distr(data_list, color_list):
     f, ax = plt.subplots(figsize=(4,2))
     for data, color in zip(data_list, color_list):
-        ax.hist(data, bins=np.logspace(np.log10(0.00001),np.log10(10.0), 50), density=False, color=color, alpha=0.5)
+        ax.hist(data, bins=np.logspace(np.log10(0.00001),np.log10(10.0), 10), density=False, color=color, alpha=0.5)
     ymax = ax.get_ylim()[1]
     for data, color in zip(data_list, color_list):
         ax.vlines(np.median(data), 0, ymax, color=color, lw=1, linestyles='dashed')

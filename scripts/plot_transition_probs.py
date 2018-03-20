@@ -84,10 +84,11 @@ def main():
                     for index in transitions:
                         if spots[index]==spots[index+1]:
                             dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
-                            if np.any(dist_to_pre>16):
-                                far += 1
-                            else:
-                                same += 1
+                            #if np.any(dist_to_pre>16):
+                            #    far += 1
+                            #else:
+                            #
+                            same += 1
                         else:
                             dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
                             if np.any(dist_to_pre>16):
