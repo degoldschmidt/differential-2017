@@ -60,6 +60,14 @@ palette = {    -1: '#ff00fc',
                 4: '#ffc04c',
                 5: '#4c8bff',
                 6: '#ff1100'}
+palette = {    -1: '#ff00fc',
+                0: '#ff00c7',
+                1: '#ffffff',
+                2: '#ffffff',
+                3: '#ffffff',
+                4: '#ffc04c',
+                5: '#4c8bff',
+                6: '#ff1100'}
 palette2 ={     0: '#ffffff',
                 1: '#ffc04c',
                 2: '#4c8bff'}
@@ -122,9 +130,16 @@ def updatefig(i, *image):
     if NO_ANNOS:
         image[2].set_title("frame #{}".format(i))
     else:
-        image[2].set_title("frame #{}\n{}".format(i, beh[etho]))
+        image[2].set_title("frame #{}".format(i))
+        #image[2].set_title("frame #{}\n{}".format(i, beh[etho]))
     if not NO_ANNOS:
-        image[2].plot(xpos-a, ypos-b, color=palette[etho], marker='.', markersize=4)
+        if palette[etho] == '#ffffff':
+            al = 1
+            ms = 2
+        else:
+            al = 1
+            ms = 3
+        image[2].plot(xpos-a, ypos-b, color=palette[etho], marker='.', alpha=al, markersize=ms)
         image[2].get_lines()[0].set_data([xpos-a, bxpos-a], [ypos-b, bypos-b])
         image[2].get_lines()[0].set_color(palette[etho])
     else:
@@ -245,11 +260,11 @@ def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts,
     #plt.tight_layout()
     print(fig.get_size_inches()*fig.dpi)
     if ONLY_VIDEO:
-        ani_image.save(outfile+'.gif', dpi=89, writer='imagemagick')
-        #ani_image.save(outfile+'.mp4', writer='ffmpeg', dpi=180)
+        #ani_image.save(outfile+'.gif', dpi=90, writer='imagemagick')
+        ani_image.save(outfile+'.mp4', writer='ffmpeg', dpi=180)
     else:
-        ani_lines.save(outfile+'.gif', dpi=89, writer='imagemagick')
-        #ani_lines.save(outfile+'.mp4', extra_anim=[ani_image], writer='ffmpeg', dpi=180)
+        #ani_lines.save(outfile+'.gif', extra_anim=[ani_image], dpi=90, writer='imagemagick')
+        ani_lines.save(outfile+'.mp4', extra_anim=[ani_image], writer='ffmpeg', dpi=180)
 
 def respine(ax, interval, tickint, bottom):
     if interval is None:
@@ -277,23 +292,25 @@ def main():
     END = parser.parse_args().endfr
 
     # profile
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    #thisscript = os.path.basename(__file__).split('.')[0]
+    #experiment = 'DIFF'
+    #profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
 
     ### input data
     _in, _in2 = 'kinematics', 'classifier'
     _out = 'plots'
-    infolder = os.path.join(profile.out(), _in)
-    infolder2 = os.path.join(profile.out(), _in2)
-    outfolder = os.path.join(profile.out(), _out)
+    infolder = os.path.join(OUT, _in)
+    infolder2 = os.path.join(OUT, _in2)
+    outfolder = os.path.join(OUT, _out)
     _outfile = 'video'
-    db = Experiment(profile.db())
+    db = Experiment(DB)
     session = db.sessions[SESSION]
     meta = session.load_meta(VERBOSE=False)
     if os.name == 'posix':
         _file = meta['video']['file'].split('\\')[-1]
-        video_file = os.path.join("/Volumes/DATA_BACKUP/data/tracking/all_videos", _file)
+        video_file = os.path.join("/media/degoldschmidt/DATA_BACKUP/data/tracking/videos", _file)
         print("MacOSX:", video_file)
     else:
         video_file = meta['video']['file']
@@ -344,9 +361,9 @@ def main():
 
     ### save animation to file
     _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))
+    print(_file)
     run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_tseries, pixelpos, cols=ucols, outfile=_file)
-    ### delete objects
-    del profile
+
 
 if __name__ == '__main__':
     # runs as benchmark test
