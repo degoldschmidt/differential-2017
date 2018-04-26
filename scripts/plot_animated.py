@@ -89,14 +89,17 @@ def animate(frame, *args):
     for j,each_line in enumerate(lines):
         if j < 2:
             if j == 1:
-                ax_ts[j].vlines(xarray.loc[frame], 0, 1, color=palette[ydata[j]])
+                if ydata[j] > 3:
+                    ax_ts[j].vlines(xarray.loc[frame], 0, 1, color=palette[ydata[j]])
             if j == 0:
-                ax_ts[j].vlines(xarray.loc[frame], 0, 1, color=palette2[ydata[j]])
+                if ydata[j] > 0:
+                    ax_ts[j].vlines(xarray.loc[frame], 0, 1, color=palette2[ydata[j]])
                 if frame-1 in xarray.index:
                     if xarray.loc[frame] - xarray.loc[frame-1] > 0.1:
                         a = xarray.loc[frame]-0.0333
                         while a > xarray.loc[frame-1]:
-                            ax_ts[j].vlines(a, 0, 1, color=palette2[ydata[j]])
+                            if ydata[j] > 0:
+                                ax_ts[j].vlines(a, 0, 1, color=palette2[ydata[j]])
                             a -= 0.0333
         else:
           each_line.set_data(xdata, ydata[j])
