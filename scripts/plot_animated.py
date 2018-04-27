@@ -8,13 +8,14 @@ import seaborn as sns
 import numpy as np
 import imageio
 import pandas as pd
-import os
+import os, sys
 
 from pytrack_analysis.plot import set_font, swarmbox
 from pytrack_analysis.database import Experiment
 import pytrack_analysis.preprocessing as prp
 from pytrack_analysis import Classifier
 from pytrack_analysis import Multibench
+import pytrack_analysis.plot as plot
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -78,6 +79,7 @@ def animate(frame, *args):
     yarrays = args[2]
     ax_ts = args[3]
     cols = args[4]
+    play_line = args[5]
     xdata = np.array(xarray.loc[:frame+1])
     ydata = [None for i in range(6)]
     for j, each in enumerate(cols):
@@ -86,6 +88,8 @@ def animate(frame, *args):
       else:
           ydata[j] = np.array(yarrays.loc[:frame+1, each])
     # update the data of both line objects
+    for pl in play_line:
+        pl.set_xdata(xdata[-1])
     for j,each_line in enumerate(lines):
         if j < 2:
             if j == 1:
@@ -102,7 +106,7 @@ def animate(frame, *args):
                                 ax_ts[j].vlines(a, 0, 1, color=palette2[ydata[j]])
                             a -= 0.0333
         else:
-          each_line.set_data(xdata, ydata[j])
+            each_line.set_data(xdata, ydata[j])
     return lines
 
 # animate video
@@ -170,7 +174,7 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
     ucols = unflatten(cols)
     print(ucols)
     yarrays = data.loc[T[0]:T[-1], ucols]
-    gs = GridSpec(N, 2*N, height_ratios=[2,2,2,1,1])
+    gs = GridSpec(N, 2*N+1, height_ratios=[2,2,2,1,1])
     gs.update(wspace=2)
     ## video axis
     vid = imageio.get_reader(video)
@@ -178,14 +182,14 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
         fig, ax_video = plt.subplots(figsize=figsize, dpi=180)
         #fig.set_size_inches(1920/300., 1080/300., True)
     else:
-        ax_video = plt.subplot(gs[:,:4]) ### N == 5
+        ax_video = plt.subplot(gs[:,:5]) ### N == 5
     ax_video.set_aspect('equal')
     sns.despine(ax=ax_video, bottom=True, left=True)
     ax_video.get_xaxis().set_visible(False)
     ax_video.get_yaxis().set_visible(False)
     opos = ax_video.get_position()
-    if not ONLY_VIDEO:
-      ax_video.set_position([opos.x0-0.075, opos.y0, opos.width*1.25, opos.height*1.25])
+    #if not ONLY_VIDEO:
+      #ax_video.set_position([opos.x0-0.075, opos.y0, opos.width*1.25, opos.height*1.25])
     # initial frame
     scale = meta['arena']['scale']
     radius = int(scale * 12.5)
@@ -205,8 +209,9 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
 
     ax_tseries, lines = None, None
     if not ONLY_VIDEO:
-        ax_tseries, lines = [], []
-        ax, l = get_tseries_axes(gs, [4, 4])
+        ax_tseries, lines, play_line = [], [], []
+        ax, l = get_tseries_axes(gs, [4, 5])
+        play_line.append(ax.axvline(0, ymax=2, c='#ff0000', ls='-', lw=.75, zorder=100, clip_on=False))
         opos = ax.get_position()
         ax.set_position([opos.x0+0.025, opos.y0, opos.width*1.05, opos.height])
         l.set_color(ts_colors[0])
@@ -223,9 +228,13 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
         count = 0
         for i in range(1,5):
             if type(cols[i]) is list:
-              ax, l = get_tseries_axes(gs, [4-i, 4], sharex=ax_tseries[0], n=2, labels=['head', 'body'])
+              ax, l = get_tseries_axes(gs, [4-i, 5], sharex=ax_tseries[0], n=2, labels=['head', 'body'])
             else:
-              ax, l = get_tseries_axes(gs, [4-i, 4], sharex=ax_tseries[0])
+              ax, l = get_tseries_axes(gs, [4-i, 5], sharex=ax_tseries[0])
+            if i < 3:
+                play_line.append(ax.axvline(0, ymax=3, c='#ff0000', ls='-', lw=.75, zorder=100, clip_on=False))
+            else:
+                play_line.append(ax.axvline(0, ymax=1, c='#ff0000', ls='-', lw=.75, zorder=100, clip_on=False))
             opos = ax.get_position()
             ax.set_position([opos.x0+0.025, opos.y0, opos.width*1.05, opos.height])
             if type(l) is list:
@@ -252,13 +261,13 @@ def init_animation(data, time=None, cols=None, video=None, figsize=(10.666,6), i
             ax_tseries[2].hlines(125., 0, 30, colors="#aaaaaa", linestyles='dashed')
             ax_tseries[2].hlines(-125., 0, 30, colors="#aaaaaa", linestyles='dashed')
 
-    return fig, ax_video, ax_tseries, T, xarray, yarrays, im, vid, lines, ucols
+    return fig, ax_video, ax_tseries, T, xarray, yarrays, im, vid, lines, play_line, ucols
 
-def run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_ts, pixelpos, factor=1, cols=None, outfile="out"):
+def run_animation(fig, frames, xarray, yarrays, lines, play_line, im, vid, ax_video, ax_ts, pixelpos, factor=1, cols=None, outfile="out"):
     myinterval = 1000./(30*factor)
     print("Interval between frame: {}".format(myinterval))
     if not ONLY_VIDEO:
-        ani_lines = anim.FuncAnimation(fig, animate, frames, blit=True, fargs=(lines, xarray, yarrays, ax_ts, cols), interval=myinterval)
+        ani_lines = anim.FuncAnimation(fig, animate, frames, blit=True, fargs=(lines, xarray, yarrays, ax_ts, cols, play_line), interval=myinterval)
     ani_image = anim.FuncAnimation(fig, updatefig, frames, blit=True, fargs=(im, vid, ax_video, pixelpos), interval=myinterval)
     #plt.tight_layout()
     print(fig.get_size_inches()*fig.dpi)
@@ -309,23 +318,54 @@ def main():
     outfolder = os.path.join(OUT, _out)
     _outfile = 'video'
     db = Experiment(DB)
-    session = db.sessions[SESSION]
-    meta = session.load_meta(VERBOSE=False)
-    if os.name == 'posix':
-        _file = meta['video']['file'].split('\\')[-1]
-        video_file = os.path.join("/media/degoldschmidt/DATA_BACKUP/data/tracking/videos", _file)
-        print("MacOSX:", video_file)
-    else:
-        video_file = meta['video']['file']
-    first = meta['video']['first_frame']
-    csv_file = os.path.join(infolder,  '{}_{}.csv'.format(session.name, _in))
-    csv_file2 = os.path.join(infolder2,  '{}_{}.csv'.format(session.name, _in2))
-    kinedf = pd.read_csv(csv_file, index_col='frame')
-    ethodf = pd.read_csv(csv_file2, index_col='frame')
+    spot_colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
+    palette = {    -1: '#ff00fc',
+                    0: '#ff00c7',
+                    1: '#e2e2e2',
+                    2: '#e2e2e2',
+                    3: '#e2e2e2',
+                    4: '#ffc04c',
+                    5: '#4c8bff',
+                    6: '#ff1100'}
+    f, ax = plt.subplots(figsize=(10,2))
+    for i, ses in enumerate(np.arange(288)):
+        session = db.sessions[ses]
+        meta = session.load_meta(VERBOSE=False)
+        if os.name == 'posix':
+            _file = meta['video']['file'].split('\\')[-1]
+            video_file = os.path.join("/media/degoldschmidt/DATA_BACKUP/data/tracking/videos", _file)
+            print("MacOSX:", video_file)
+        else:
+            video_file = meta['video']['file']
+        first = meta['video']['first_frame']
+        try:
+            csv_file = os.path.join(infolder,  '{}_{}.csv'.format(session.name, _in))
+            csv_file2 = os.path.join(infolder2,  '{}_{}.csv'.format(session.name, _in2))
+            kinedf = pd.read_csv(csv_file, index_col='frame')
+            ethodf = pd.read_csv(csv_file2, index_col='frame')
+            print('fly:',ses)
+            ax.plot(ethodf.query('etho == 4').index, len(ethodf.query('etho == 4').index)*[i], '.', color=spot_colors['yeast'], markersize=2)
+            ax.plot(ethodf.query('etho == 5').index, len(ethodf.query('etho == 5').index)*[i], '.', color=spot_colors['sucrose'], markersize=2)
+            f2, ax2 = plt.subplots(figsize=(5,5))
+            colors = ethodf['etho'].apply(lambda x: palette[x])
+            ax2 = plot.arena(meta['arena'], meta['food_spots'], ax=ax2)
+            ax2.scatter(kinedf['head_x'], kinedf['head_y'], color=colors, zorder=2, s=.75, alpha=.75, marker='.')
+            ax2.set_xlim([-31,31])
+            ax2.set_ylim([-31,31])
+            plt.tight_layout()
+            f2.savefig(os.path.join(outfolder, 'traj_{:03d}.png'.format(ses)), dpi=600)
+        except FileNotFoundError:
+            pass
+    ax.set_xlim([12000,17000])
+    ax.set_xticks(np.arange(12000,18000, 1000))
+    plt.tight_layout()
+    f.savefig(os.path.join(outfolder, 'visit.pdf'), dpi=300)
+
+    sys.exit(0)
     kinedf['min_patch'] = kinedf.loc[:,['dpatch_{}'.format(i) for i in range(11)]].min(axis=1)
     df = pd.concat([kinedf[['elapsed_time', 'sm_head_speed', 'sm_body_speed', 'angular_speed', 'min_patch']], ethodf[['etho', 'visit']]], axis=1)
     data_cols = ['visit', 'etho', 'angular_speed', ['sm_head_speed', 'sm_body_speed'], 'min_patch']
-    fig, ax_video, ax_tseries, frames, xarray, yarrays, im, vid, lines, ucols = init_animation(df, time='elapsed_time', cols=data_cols, video=video_file, figsize=(8,6), interval=[START,END], meta=meta) ##(10.6666666,6)
+    fig, ax_video, ax_tseries, frames, xarray, yarrays, im, vid, lines, play_line, ucols = init_animation(df, time='elapsed_time', cols=data_cols, video=video_file, figsize=(13,6), interval=[START,END], meta=meta) ##(10.6666666,6)
     if not ONLY_VIDEO:
         lines[0].set_color('#222222')
         ax_tseries[0].set_xlabel('Time [s]')
@@ -348,8 +388,8 @@ def main():
         ax_tseries[4].set_ylabel('Min. distance\nto patch [mm]')
         ax_tseries[3].set_ylabel('Linear\nspeed [mm/s]')
         ax_tseries[2].set_ylabel('Angular\nspeed [º/s]')
-        ax_tseries[1].set_ylabel('Ethogram', labelpad=40)
-        ax_tseries[0].set_ylabel('Visits', labelpad=40)
+        ax_tseries[1].set_ylabel('Feeding\nevent', labelpad=40)
+        ax_tseries[0].set_ylabel('Visit', labelpad=40)
         if NO_ANNOS:
           ax_tseries[1].set_visible(False)
           ax_tseries[0].set_visible(False)
@@ -365,7 +405,7 @@ def main():
     ### save animation to file
     _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))
     print(_file)
-    run_animation(fig, frames, xarray, yarrays, lines, im, vid, ax_video, ax_tseries, pixelpos, cols=ucols, outfile=_file)
+    run_animation(fig, frames, xarray, yarrays, lines, play_line, im, vid, ax_video, ax_tseries, pixelpos, cols=ucols, outfile=_file)
 
 
 if __name__ == '__main__':
