@@ -302,11 +302,6 @@ def main():
     SESSION = parser.parse_args().session
     START = parser.parse_args().startfr
     END = parser.parse_args().endfr
-
-    # profile
-    #thisscript = os.path.basename(__file__).split('.')[0]
-    #experiment = 'DIFF'
-    #profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
     OUT = '/home/degoldschmidt/post_tracking'
     DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
 
@@ -318,50 +313,23 @@ def main():
     outfolder = os.path.join(OUT, _out)
     _outfile = 'video'
     db = Experiment(DB)
-    spot_colors = {'yeast': '#ffc04c', 'sucrose': '#4c8bff'}
-    palette = {    -1: '#ff00fc',
-                    0: '#ff00c7',
-                    1: '#e2e2e2',
-                    2: '#e2e2e2',
-                    3: '#e2e2e2',
-                    4: '#ffc04c',
-                    5: '#4c8bff',
-                    6: '#ff1100'}
-    f, ax = plt.subplots(figsize=(10,2))
-    for i, ses in enumerate(np.arange(288)):
-        session = db.sessions[ses]
-        meta = session.load_meta(VERBOSE=False)
-        if os.name == 'posix':
-            _file = meta['video']['file'].split('\\')[-1]
-            video_file = os.path.join("/media/degoldschmidt/DATA_BACKUP/data/tracking/videos", _file)
-            print("MacOSX:", video_file)
-        else:
-            video_file = meta['video']['file']
-        first = meta['video']['first_frame']
-        try:
-            csv_file = os.path.join(infolder,  '{}_{}.csv'.format(session.name, _in))
-            csv_file2 = os.path.join(infolder2,  '{}_{}.csv'.format(session.name, _in2))
-            kinedf = pd.read_csv(csv_file, index_col='frame')
-            ethodf = pd.read_csv(csv_file2, index_col='frame')
-            print('fly:',ses)
-            ax.plot(ethodf.query('etho == 4').index, len(ethodf.query('etho == 4').index)*[i], '.', color=spot_colors['yeast'], markersize=2)
-            ax.plot(ethodf.query('etho == 5').index, len(ethodf.query('etho == 5').index)*[i], '.', color=spot_colors['sucrose'], markersize=2)
-            f2, ax2 = plt.subplots(figsize=(5,5))
-            colors = ethodf['etho'].apply(lambda x: palette[x])
-            ax2 = plot.arena(meta['arena'], meta['food_spots'], ax=ax2)
-            ax2.scatter(kinedf['head_x'], kinedf['head_y'], color=colors, zorder=2, s=.75, alpha=.75, marker='.')
-            ax2.set_xlim([-31,31])
-            ax2.set_ylim([-31,31])
-            plt.tight_layout()
-            f2.savefig(os.path.join(outfolder, 'traj_{:03d}.png'.format(ses)), dpi=600)
-        except FileNotFoundError:
-            pass
-    ax.set_xlim([12000,17000])
-    ax.set_xticks(np.arange(12000,18000, 1000))
-    plt.tight_layout()
-    f.savefig(os.path.join(outfolder, 'visit.pdf'), dpi=300)
+    session = db.sessions[SESSION]
+    meta = session.load_meta(VERBOSE=False)
+    if os.name == 'posix':
+        _file = meta['video']['file'].split('\\')[-1]
+        video_file = os.path.join("/media/degoldschmidt/DATA_BACKUP/data/tracking/videos", _file)
+        print("MacOSX:", video_file)
+    else:
+        video_file = meta['video']['file']
+    first = meta['video']['first_frame']
+    try:
+        csv_file = os.path.join(infolder,  '{}_{}.csv'.format(session.name, _in))
+        csv_file2 = os.path.join(infolder2,  '{}_{}.csv'.format(session.name, _in2))
+        kinedf = pd.read_csv(csv_file, index_col='frame')
+        ethodf = pd.read_csv(csv_file2, index_col='frame')
+    except FileNotFoundError:
+        pass
 
-    sys.exit(0)
     kinedf['min_patch'] = kinedf.loc[:,['dpatch_{}'.format(i) for i in range(11)]].min(axis=1)
     df = pd.concat([kinedf[['elapsed_time', 'sm_head_speed', 'sm_body_speed', 'angular_speed', 'min_patch']], ethodf[['etho', 'visit']]], axis=1)
     data_cols = ['visit', 'etho', 'angular_speed', ['sm_head_speed', 'sm_body_speed'], 'min_patch']
