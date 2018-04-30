@@ -22,12 +22,12 @@ def plot_swarm(data, x, y, sub, conds, mypal):
     rdata = rdata.query(querystr[:-len(astr)])
     # swarmbox
     if len(conds) > 2:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])], boxonly=True)
         ###violinplot
         #ax = sns.violinplot(x=x, y=y, data=rdata, order=conds, palette=mypal, cut=0, linewidth=.5, ax=ax)
         #ax.tick_params('x', length=0, width=0, which='major')
     else:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])], boxonly=True)
     return ax
 
 def main():
@@ -41,23 +41,23 @@ def main():
     parser.add_argument('-c', nargs='+', type=str)
     OVERWRITE = parser.parse_args().force
 
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db())
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
+    db = Experiment(DB)
     sessions = db.sessions
     n_ses = len(sessions)
 
     conds = ["SAA", "AA", "S", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
-    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    #colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    colormap = {'SAA': "#b1b1b1", 'AA': "#5788e7", 'S': "#424242", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
     EthoTotals = {each_condition: {} for each_condition in conds}
     _in, _in2, _out = 'classifier', 'segments', 'plots'
-    infolder = os.path.join(profile.out(), _in)
-    in2folder = os.path.join(profile.out(), _in2)
-    outfolder = os.path.join(profile.out(), _out)
+    infolder = os.path.join(OUT, _in)
+    in2folder = os.path.join(OUT, _in2)
+    outfolder = os.path.join(OUT, _out)
     outdf = {'session': [], 'condition': [], 'substrate': [], 'duration': []}
 
     _outfile = 'visits_mean_duration'
@@ -90,9 +90,9 @@ def main():
     print(outdf)
 
     #### Plotting
-    my_ylims = [8, 3]
-    annos = [(7.,0.2), (2.5,0.05)]
-    my_yticks = [2, 1]
+    my_ylims = [0.5, 3]
+    annos = [(0.4,0.2), (2.5,0.05)]
+    my_yticks = [.1, 1]
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax = plot_swarm(outdf, 'condition', 'duration', sub, conds, mypal)
         annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]
@@ -102,15 +102,18 @@ def main():
                 y += annos[j][1]
             each.set_position((each.get_position()[0], y))
         print(annotations)
+        """
         ax,_ = plot.annotate(0,1,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
         ax,_ = plot.annotate(0,2,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
         ax,_ = plot.annotate(0,3,0.1,[5.8],[5.8], stars=True, ax=ax, align='right', _h=0.2, _ht=100.2)
+        """
         ### extra stuff
         ax.set_yticks(np.arange(0,my_ylims[j]+1,my_yticks[j]))
         ax.set_ylim([-0.1*my_ylims[j],1.1*my_ylims[j]])
         sns.despine(ax=ax, bottom=True, trim=True)
-        ax.set_xlabel('pre-diet condition')
-        ax.set_ylabel('Mean duration of\n{} visits [min]'.format(sub))
+        ax.set_xticklabels(['+', '-'])
+        ax.set_xlabel('Amino acids')
+        ax.set_ylabel('\nMean duration of\n{} visits [min]'.format(sub))
 
         ### saving files
         plt.tight_layout()
@@ -120,7 +123,7 @@ def main():
         plt.cla()
 
     ### delete objects
-    del profile
+    #del profile
 
 if __name__ == '__main__':
     # runs as benchmark test

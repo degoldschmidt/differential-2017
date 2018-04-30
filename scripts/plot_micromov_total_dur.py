@@ -21,9 +21,9 @@ def plot_swarm(data, x, y, sub, conds, mypal):
     rdata = rdata.query(querystr[:-len(astr)])
     # swarmbox
     if len(conds) > 2:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])], boxonly=True)
     else:
-        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])], boxonly=True)
 
     if sub == 'yeast':
         stat, pval = ranksums(rdata.query('condition == "S"')['total_duration'], rdata.query('condition == "O"')['total_duration'])
@@ -47,23 +47,26 @@ def main():
     parser.add_argument('-suf', type=str)
     OVERWRITE = parser.parse_args().force
 
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db())
+    #thisscript = os.path.basename(__file__).split('.')[0]
+    #experiment = 'DIFF'
+    # = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
+    db = Experiment(DB)
     sessions = db.sessions
     n_ses = len(sessions)
 
     conds = ["SAA", "S", "AA", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
-    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    #colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    colormap = {'SAA': "#424242", 'AA': "#5788e7", 'S': "#999999", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
 
     _in, _in2, _out = 'classifier', 'segments', 'plots'
-    infolder = os.path.join(profile.out(), _in)
-    in2folder = os.path.join(profile.out(), _in2)
-    outfolder = os.path.join(profile.out(), _out)
+    infolder = os.path.join(OUT, _in)
+    in2folder = os.path.join(OUT, _in2)
+    outfolder = os.path.join(OUT, _out)
     outdf = {'session': [], 'condition': [], 'substrate': [], 'total_duration': []}
     _outfile = 'total_micromovements'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
@@ -102,9 +105,9 @@ def main():
     f, ax = plt.subplots(figsize=(3,2.5))
 
     # swarmbox
-    ymax = [60, 20]#[50, 5] ### Vero: 50, 10
-    yt = [15, 5]
-    annos = [(55,.8), (18.5,0.1)] ### 55 -> 48 sucrose deprived
+    ymax = [15, 20]#[50, 5] ### Vero: 50, 10
+    yt = [5, 5]
+    annos = [(14,.1), (18.5,0.1)] ### 55 -> 48 sucrose deprived
     for j, sub in enumerate(['yeast', 'sucrose']):
         ax, pval = plot_swarm(outdf, 'condition', 'total_duration', sub, conds, mypal)
         ### moving text
@@ -118,16 +121,17 @@ def main():
         ###
         #X = outdf.query('condition == "SAA" and total_duration < 4').dropna()['total_duration']
         #Y = outdf.query('condition == "S" and total_duration < 4').dropna()['total_duration']
-        if sub == 'yeast':
-            ax,_ = plot.annotate(1,3,pval,[40],[40], stars=True, ax=ax, align='center', _h=0.05, _ht=1.2)
-        else:
-            ax,_ = plot.annotate(2,3,pval,[12],[12], stars=True, ax=ax, align='center', _h=0.05, _ht=0.1)
+        #if sub == 'yeast':
+            #ax,_ = plot.annotate(0,1,pval,[14],[14], stars=True, ax=ax, align='center', _h=0.05, _ht=.1)
+        #else:
+            #ax,_ = plot.annotate(2,3,pval,[12],[12], stars=True, ax=ax, align='center', _h=0.05, _ht=0.1)
 
         ### extra stuff
         ax.set_ylim([-0.05*ymax[j],ymax[j]])
         ax.set_yticks(np.arange(0, ymax[j]+1, yt[j]))
         sns.despine(ax=ax, bottom=True, trim=True)
-        ax.set_xlabel('pre-diet condition')
+        ax.set_xticklabels(['+', '-'])
+        ax.set_xlabel('Amino acids')
         ax.set_ylabel('Total duration\nof {}\nmicromovements [min]'.format(sub))
 
         ### saving files
@@ -140,7 +144,7 @@ def main():
         plt.cla()
 
     ### delete objects
-    del profile
+    #del profile
 
 if __name__ == '__main__':
     # runs as benchmark test

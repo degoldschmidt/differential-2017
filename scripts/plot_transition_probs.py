@@ -24,10 +24,9 @@ def main():
     parser.add_argument('-c', nargs='+', type=str)
     OVERWRITE = parser.parse_args().force
 
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db())
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
+    db = Experiment(DB)
     sessions = db.sessions
     n_ses = len(sessions)
 
@@ -35,15 +34,16 @@ def main():
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
     colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    colormap = {'SAA': "#b1b1b1", 'AA': "#5788e7", 'S': "#424242", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
     substrates = ['yeast', 'sucrose']
     ### inputs
     _in = ['kinematics', 'classifier']
-    infolder = [os.path.join(profile.out(), each) for each in _in]
+    infolder = [os.path.join(OUT, each) for each in _in]
     ### outputs
     _out = 'plots'
-    outfolder = os.path.join(profile.out(), _out)
-    outdf = {   'session': [], 'condition': [], 'substrate': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'total': []}
+    outfolder = os.path.join(OUT, _out)
+    outdf = {   'session': [], 'condition': [], 'substrate': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'avg_dist': [], 'total': []}
     _outfile = 'transition_probability'
     data_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(data_file) and not OVERWRITE:
@@ -62,7 +62,7 @@ def main():
                 per_frame_df = pd.concat(dfs, axis=1)
 
                 segment_cols = ['visit', 'visit_index']
-                segmfolder = os.path.join(profile.out(), 'segments')
+                segmfolder = os.path.join(OUT, 'segments')
                 csv_file = [os.path.join(segmfolder, '{}_{}_{}.csv'.format(each.name, 'segments', segm)) for segm in segment_cols]
                 dfs = [pd.read_csv(_file, index_col='segment') for _file in csv_file]
                 per_segment_df = dfs[0]
@@ -80,15 +80,22 @@ def main():
                     transitions = np.where(visit_transitions == 2*(j+1))[0]
                     print(2*(j+1), len(transitions))
                     Ntrans = len(transitions)
-                    same, near, far = 0, 0, 0
+                    same, near, far, avg_dist = 0, 0, 0, 0.0
                     for index in transitions:
+                        x = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['body_x']
+                        y = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['body_y']
+                        dt = np.array(per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['frame_dt'])[:,0]
+                        dx, dy = np.append(0, np.diff(x)), np.append(0, np.diff(y))
+                        ##dx, dy = np.divide(dx,dt), np.divide(dy,dt)
+                        dist_travelled = np.sum(np.sqrt(dx*dx + dy*dy))
+                        print('Distance:', dist_travelled)
+                        avg_dist += dist_travelled
                         if spots[index]==spots[index+1]:
                             dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
-                            #if np.any(dist_to_pre>16):
-                            #    far += 1
-                            #else:
-                            #
-                            same += 1
+                            if np.any(dist_to_pre>16):
+                                far += 1
+                            else:
+                                same += 1
                         else:
                             dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
                             if np.any(dist_to_pre>16):
@@ -101,6 +108,7 @@ def main():
                         same /= Ntrans
                         near /= Ntrans
                         far /= Ntrans
+                        avg_dist /= Ntrans
                     #{'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': []}
                     outdf['session'].append(each.name)
                     outdf['condition'].append(meta['condition'])
@@ -108,6 +116,7 @@ def main():
                     outdf['same_patch'].append(same)
                     outdf['near_patch'].append(near)
                     outdf['far_patch'].append(far)
+                    outdf['avg_dist'].append(avg_dist)
                     outdf['total'].append(Ntrans)
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
@@ -128,7 +137,8 @@ def main():
     for j, each in enumerate(substrates):
         if onlyAA: width = 6
         else: width = 2.*len(conds)+1
-        f, axes = plt.subplots(1,3,figsize=(width,2.5))
+        #f, axes = plt.subplots(1,3,figsize=(width,2.5))
+        f, ax = plt.subplots(figsize=(1+2*len(conds)/4,2.5))
         data = outdf.query('substrate == "{}" and total > 4'.format(each))
         querystr = ''
         astr = ' or '
@@ -136,28 +146,32 @@ def main():
             querystr += 'condition == "{}"'.format(condition)
             querystr += astr
         rdata = data.query(querystr[:-len(astr)])
-        patchid = ['far_patch', 'near_patch', 'same_patch']
-        patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each)]
-        for i, ax in enumerate(axes):
-            print(conds)
-            if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
+        patchid = ['far_patch', 'near_patch', 'same_patch', 'avg_dist']
+        patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each), 'average distance']
+        #for i, ax in enumerate(axes):
+        i=3
+        print(conds)
+        if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
+        else:
+            if len(conds) > 2:
+                ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])], boxonly=True)
             else:
-                if len(conds) > 2:
-                    ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
-                else:
-                    ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+                ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])], boxonly=True)
 
-            annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
-            for an in annotations:
-                an.set_position((an.get_position()[0], an.get_position()[1]+0.09))
-            print(annotations)
-            ax.set_yticks([0,0.5,1])
-            ax.set_ylim([-.05, 1.25])
-            sns.despine(ax=ax, bottom=True, trim=True)
-            xlabel= ''
-            if onlyAA: xlabel= 'AA'
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel('Transition\nprobability to\n{}'.format(patchlab[i]))
+        annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
+        for an in annotations:
+            an.set_position((an.get_position()[0], 800))
+        print(annotations)
+        ax.set_yticks([0,0.5,1])
+        ax.set_ylim([-.05, 1.25])
+        ### avg distance travelled
+        ax.set_yticks(np.arange(0,900,200))
+        ax.set_ylim([-20, 920])
+        sns.despine(ax=ax, bottom=True, trim=True)
+        ax.set_xticklabels(['+', '-'])
+        ax.set_xlabel('Amino acids')
+        #ax.set_ylabel('Transition\nprobability to\n{}'.format(patchlab[i]))
+        ax.set_ylabel('Mean dist.\ntraveled between\nyeast patches [mm]')
 
         plt.tight_layout()
         suffix = ''
@@ -186,7 +200,7 @@ def main():
             plt.clf()
         """
     ### delete objects
-    del profile
+    #del profile
 
 if __name__ == '__main__':
     # runs as benchmark test

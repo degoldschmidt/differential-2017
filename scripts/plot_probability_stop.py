@@ -20,63 +20,14 @@ def reduce_data(data, sub, conds):
     rdata = rdata.query(querystr[:-len(astr)])
     return rdata
 
-def bootstrap_data(data, x, y, sub, conds, ssample, times):
-    rdata = reduce_data(data, sub, conds)
-    pvaldf = {'condition': [], 'pval': []}
-    for t in range(times):
-        if t%100 == 0:
-            print(t)
-        if ssample is not None:
-            ssdata = pd.DataFrame(columns=rdata.columns)
-            for condition in conds:
-                M = len(rdata.query('condition == "{}"'.format(condition)).index)
-                seeds = np.random.randint(0,high=10000000)
-                #print(seeds)
-                np.random.seed(seeds)
-                random_choices = np.random.choice(M,ssample)
-                #print(random_choices)
-                samples = rdata.query('condition == "{}"'.format(condition)).iloc[random_choices]
-                ssdata = ssdata.append(samples)
-
-        for each in conds[1:]:
-            X, Y = ssdata.query('condition == "{}"'.format(conds[0]))[y], ssdata.query('condition == "{}"'.format(each))[y]
-            _, pval = ranksums(np.array(X),np.array(Y))
-            if sub == 'yeast':
-                if each == 'S' or each == 'O':
-                    pvaldf['condition'].append(each)
-                    pvaldf['pval'].append(pval)
-            else:
-                if each == 'AA' or each == 'O':
-                    pvaldf['condition'].append(each)
-                    pvaldf['pval'].append(pval)
-    pvaldf = pd.DataFrame(pvaldf)
-    return pvaldf
-
-
-def plot_pval_distr(data_list, color_list):
-    f, ax = plt.subplots(figsize=(4,2))
-    for data, color in zip(data_list, color_list):
-        ax.hist(data, bins=np.logspace(np.log10(0.0000000001),np.log10(10.0), 20), density=False, color=color, alpha=0.5)
-    ymax = ax.get_ylim()[1]
-    for data, color in zip(data_list, color_list):
-        ax.vlines(np.median(data), 0, ymax, color=color, lw=1, linestyles='dashed')
-        print(np.median(data))
-    ax.set_ylim([0, ymax])
-    ax.set_xscale("log")
-    ax.set_xlabel('p-value (log-scale)')
-    ax.set_ylabel('counts')
-    return ax
-
-
-def plot_swarm(data, x, y, sub, conds, mypal, ssample, times):
+def plot_swarm(data, x, y, sub, conds, mypal):
     f, ax = plt.subplots(figsize=(0.5*len(conds)+1,2.5))
     rdata = reduce_data(data, sub, conds)
     # swarmbox
-    if times is None:
-        if len(conds) > 2:
-            ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])])
-        else:
-            ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])])
+    if len(conds) > 2:
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1:])], boxonly=True)
+    else:
+        ax = plot.swarmbox(x=x, y=y, data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])], boxonly=True)
     return ax
 
 def main():
@@ -91,23 +42,26 @@ def main():
     parser.add_argument('-suf', type=str)
     OVERWRITE = parser.parse_args().force
 
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db())
+    #thisscript = os.path.basename(__file__).split('.')[0]
+    #experiment = 'DIFF'
+    #profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
+    db = Experiment(DB)
     sessions = db.sessions
     n_ses = len(sessions)
 
     conds = ["SAA", "S", "AA", "O"]
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
-    colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    #colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
+    colormap = {'SAA': "#b1b1b1", 'AA': "#5788e7", 'S': "#424242", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
     EthoTotals = {each_condition: {} for each_condition in conds}
     _in, _in2, _out = 'classifier', 'segments', 'plots'
-    infolder = os.path.join(profile.out(), _in)
-    in2folder = os.path.join(profile.out(), _in2)
-    outfolder = os.path.join(profile.out(), _out)
+    infolder = os.path.join(OUT, _in)
+    in2folder = os.path.join(OUT, _in2)
+    outfolder = os.path.join(OUT, _out)
     outdf = {'session': [], 'condition': [], 'substrate': [], 'ratio': []}
     _outfile = 'probability_stop'
     hook_file = os.path.join(outfolder, "{}.csv".format(_outfile))
@@ -151,11 +105,15 @@ def main():
     print(outdf)
 
     #### Plotting
+    ymax = [15, 20]#[50, 5] ### Vero: 50, 10
+    yt = [5, 5]
+    annos = [(.90,.1), (18.5,0.1)] ### 55 -> 48 sucrose deprived
     for j, sub in enumerate(['yeast', 'sucrose']):
-        ax = plot_swarm(outdf, 'condition', 'ratio', sub, conds, mypal, subsample, TIMES)
+        ax = plot_swarm(outdf, 'condition', 'ratio', sub, conds, mypal)
         annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
         for each in annotations:
-            each.set_position((each.get_position()[0], each.get_position()[1] + 0.1))
+            y = annos[j][0]
+            each.set_position((each.get_position()[0], y))
 
 
         if sub == 'yeast':
@@ -166,15 +124,16 @@ def main():
         print(l_c, sub, pval)
         if len(conds) > 2:
             if sub == 'yeast':
-                ax,_ = plot.annotate(1,3,pval,[0.88],[0.88], stars=True, ax=ax, align='center', _h=0.0, _ht=0.02)
+                ax,_ = plot.annotate(1,3,pval,[0.75],[0.75], stars=True, ax=ax, align='center', _h=0.0, _ht=0.02)
             else:
                 ax,_ = plot.annotate(2,3,pval,[0.75],[0.75], stars=True, ax=ax, align='center', _h=0.0, _ht=0.05)
 
         ### extra stuff
         ax.set_yticks([0,0.5,1])
-        ax.set_ylim([-0.1,1.2])
+        ax.set_ylim([-0.05,1.05])
         sns.despine(ax=ax, bottom=True, trim=True)
-        ax.set_xlabel('pre-diet condition')
+        ax.set_xticklabels(['+', '-'])
+        ax.set_xlabel('Amino acids')
         ax.set_ylabel('Probability of\nstopping at a\n{} patch'.format(sub))
 
         ### saving files
@@ -187,7 +146,7 @@ def main():
         plt.cla()
 
     ### delete objects
-    del profile
+    #del profile
 
 if __name__ == '__main__':
     # runs as benchmark test
