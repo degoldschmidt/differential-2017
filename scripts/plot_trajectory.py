@@ -27,16 +27,18 @@ def main():
     START = parser.parse_args().startfr
     END = parser.parse_args().endfr
 
-    thisscript = os.path.basename(__file__).split('.')[0]
-    experiment = 'DIFF'
-    profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
-    db = Experiment(profile.db())
+    #thisscript = os.path.basename(__file__).split('.')[0]
+    #experiment = 'DIFF'
+    #profile = get_profile(experiment, 'degoldschmidt', script=thisscript)
+    OUT = '/home/degoldschmidt/post_tracking'
+    DB = '/home/degoldschmidt/post_tracking/DIFF.yaml'
+    db = Experiment(DB)
 
     conds = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
     in_suffix  =  ['kinematics', 'classifier']
     out_suffix =  'plots'
-    infolder = [os.path.join(profile.out(), suf) for suf in in_suffix]
-    outfolder = os.path.join(profile.out(), out_suffix)
+    infolder = [os.path.join(OUT, suf) for suf in in_suffix]
+    outfolder = os.path.join(OUT, out_suffix)
     outdf = {'session': [], 'condition': [], 'ratio': []}
     _outfile = 'trajectory'
     if SESSION is None: listsession = db.sessions
@@ -52,6 +54,7 @@ def main():
         if os.path.isfile(hook_file) and not OVERWRITE:
             print('Found data hook for session {}'.format(session.name))
             outdf = pd.read_csv(hook_file, index_col='id')
+            outdf = outdf.loc[START:END]
         else:
             print('Compute data for session {}'.format(session.name))
             ### Loading data
@@ -78,12 +81,12 @@ def main():
                     ax.add_artist(plt.Circle((x,y), 5, ls='dotted', color='#818181', fill=False, lw=1))
 
             # trajectory plot
-            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 6], to_body=[3], size=12, ax=ax)
-            ax.plot(np.array(outdf['head_x'])[0], np.array(outdf['head_y'])[0], '#aaaaaa', marker='s', markersize=1)
+            ax = plot.trajectory(xc='head_x', yc='head_y', xs='body_x', ys='body_y', data=outdf, hue='etho', no_hue=[0, 1, 2, 3, 6], to_body=[], size=1, ax=ax)
+            ax.plot(np.array(outdf['head_x'])[0], np.array(outdf['head_y'])[0], '#00ff12', marker='*', markersize=3)
             intval = 200
-            timepoints = np.array(outdf['elapsed_time'])[intval::intval,0]
+            timepoints = np.array(outdf['elapsed_time'])[intval::intval]
             #ax.scatter(np.array(outdf['head_x'])[intval::intval], np.array(outdf['head_y'])[intval::intval], c=timepoints, cmap=plt.get_cmap('viridis'), marker='s', s=1, zorder=10)
-            ax.plot(np.array(outdf['head_x'])[-1], np.array(outdf['head_y'])[-1], 'k', marker='s', markersize=1)
+            ax.plot(np.array(outdf['head_x'])[-1], np.array(outdf['head_y'])[-1], '#ff0000', marker='*', markersize=3)
             ax.add_artist(plt.Rectangle((30, 30), 2, 2, color = conds[meta['condition']]))
             ax.text(30, 35, meta['condition'])
             #ax.set_title('{}'.format(session.name), fontweight='bold', loc='left')
@@ -91,10 +94,14 @@ def main():
             ax.set_ylim([-13.5,11.5])
             ax.set_xlim([0.5,15.5])
             ax.set_ylim([-3.,12.])
+            r = 30.5
+            ax.set_xlim([-r,r])
+            ax.set_ylim([-r,r])
             # output
             plt.tight_layout()
+            _file = os.path.join(outfolder, "{}_{}_{}_{}".format(_outfile, session.name, START, END))
             _file = os.path.join(outfolder, "{}_{}".format(_outfile, session.name))
-            plt.savefig(_file+'.pdf', dpi=300)
+            #plt.savefig(_file+'.pdf', dpi=300)
             #plt.savefig(_file+'.svg', dpi=300)
             plt.savefig(_file+'.png', dpi=300)
             plt.cla()
@@ -102,7 +109,7 @@ def main():
             plt.close()
 
     ### delete objects
-    del profile
+    #del profile
 
 if __name__ == '__main__':
     # runs as benchmark test

@@ -2,6 +2,7 @@ from pytrack_analysis.profile import get_profile
 from pytrack_analysis.database import Experiment
 from pytrack_analysis.plot import set_font, swarmbox
 from pytrack_analysis import Multibench
+import pytrack_analysis.preprocessing as prp
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -34,7 +35,7 @@ def main():
     if parser.parse_args().c is not None:
         conds = parser.parse_args().c
     colormap = {'SAA': "#98c37e", 'AA': "#5788e7", 'S': "#D66667", 'O': "#B7B7B7"}
-    colormap = {'SAA': "#b1b1b1", 'AA': "#5788e7", 'S': "#424242", 'O': "#B7B7B7"}
+    #colormap = {'SAA': "#b1b1b1", 'AA': "#5788e7", 'S': "#424242", 'O': "#B7B7B7"}
     mypal = {condition: colormap[condition]  for condition in conds}
     substrates = ['yeast', 'sucrose']
     ### inputs
@@ -43,7 +44,7 @@ def main():
     ### outputs
     _out = 'plots'
     outfolder = os.path.join(OUT, _out)
-    outdf = {   'session': [], 'condition': [], 'substrate': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'avg_dist': [], 'total': []}
+    outdf = {   'session': [], 'condition': [], 'substrate': [], 'same_patch': [], 'near_patch': [], 'far_patch': [], 'avg_dist': [],  'avg_hsp': [],  'avg_bsp': [], 'total': []}
     _outfile = 'transition_probability'
     data_file = os.path.join(outfolder, "{}.csv".format(_outfile))
     if os.path.isfile(data_file) and not OVERWRITE:
@@ -55,6 +56,7 @@ def main():
             ### Loading data
             try:
                 ### Loading data
+                print()
                 print(each.name)
                 meta = each.load_meta()
                 csv_file = [os.path.join(infolder[i_in], '{}_{}.csv'.format(each.name, each_in)) for i_in, each_in in enumerate(_in)]
@@ -80,16 +82,22 @@ def main():
                     transitions = np.where(visit_transitions == 2*(j+1))[0]
                     print(2*(j+1), len(transitions))
                     Ntrans = len(transitions)
-                    same, near, far, avg_dist = 0, 0, 0, 0.0
+                    same, near, far, avg_dist, avg_hsp, avg_bsp = 0, 0, 0, 0.0, 0.0, 0.0
                     for index in transitions:
-                        x = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['body_x']
-                        y = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['body_y']
+                        xy = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]][['body_x', 'body_y']]
+                        hsp = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['sm_head_speed']
+                        bsp = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['sm_body_speed']
+                        window_len = 10 # now: 10/0.333 s #### before used (15/0.5 s)
+                        sigma = window_len/10.
+                        xy = prp.gaussian_filter(xy, _len=window_len, _sigma=sigma)
                         dt = np.array(per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['frame_dt'])[:,0]
+                        x, y = xy['body_x'], xy['body_y']
                         dx, dy = np.append(0, np.diff(x)), np.append(0, np.diff(y))
                         ##dx, dy = np.divide(dx,dt), np.divide(dy,dt)
                         dist_travelled = np.sum(np.sqrt(dx*dx + dy*dy))
-                        print('Distance:', dist_travelled)
                         avg_dist += dist_travelled
+                        avg_hsp += np.nanmean(hsp)
+                        avg_bsp += np.nanmean(bsp)
                         if spots[index]==spots[index+1]:
                             dist_to_pre = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['dpatch_{}'.format(spots[index])]
                             if np.any(dist_to_pre>16):
@@ -109,6 +117,11 @@ def main():
                         near /= Ntrans
                         far /= Ntrans
                         avg_dist /= Ntrans
+                        print('Avg. dist.:', avg_dist)
+                        avg_hsp /= Ntrans
+                        print('Avg. head speed:', avg_hsp)
+                        avg_bsp /= Ntrans
+                        print('Avg. body speed:', avg_bsp)
                     #{'session': [], 'condition': [], 'same_patch': [], 'near_patch': [], 'far_patch': []}
                     outdf['session'].append(each.name)
                     outdf['condition'].append(meta['condition'])
@@ -117,6 +130,8 @@ def main():
                     outdf['near_patch'].append(near)
                     outdf['far_patch'].append(far)
                     outdf['avg_dist'].append(avg_dist)
+                    outdf['avg_hsp'].append(avg_hsp)
+                    outdf['avg_bsp'].append(avg_bsp)
                     outdf['total'].append(Ntrans)
             except FileNotFoundError:
                 pass #print(csv_file+ ' not found!')
@@ -146,10 +161,10 @@ def main():
             querystr += 'condition == "{}"'.format(condition)
             querystr += astr
         rdata = data.query(querystr[:-len(astr)])
-        patchid = ['far_patch', 'near_patch', 'same_patch', 'avg_dist']
-        patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each), 'average distance']
+        patchid = ['far_patch', 'near_patch', 'same_patch', 'avg_dist', 'avg_hsp', 'avg_bsp']
+        patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each), 'Mean dist.\ntraveled between\nyeast patches [mm]', 'Mean speed\nbetween yeast\npatches [mm/s]', 'Mean speed\nbetween yeast\npatches [mm/s]']
         #for i, ax in enumerate(axes):
-        i=3
+        i=5
         print(conds)
         if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
         else:
@@ -158,25 +173,28 @@ def main():
             else:
                 ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, order=conds, palette=mypal, compare=[(conds[0], conds[1])], boxonly=True)
 
-        annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text())]
+        annotations = [child for child in ax.get_children() if isinstance(child, plt.Text) and ("*" in child.get_text() or 'ns' in child.get_text())]
         for an in annotations:
-            an.set_position((an.get_position()[0], 800))
+            anny = [1, 1, 1, 800, 7.5, 7.5]
+            an.set_position((an.get_position()[0], anny[i]))
         print(annotations)
         ax.set_yticks([0,0.5,1])
         ax.set_ylim([-.05, 1.25])
         ### avg distance travelled
-        ax.set_yticks(np.arange(0,900,200))
-        ax.set_ylim([-20, 920])
+        yt = [(0,1.1,0.5), (0,1.1,0.5), (0,1.1,0.5), (0,900,200), (0,10,2), (0,10,2)]
+        ax.set_yticks(np.arange(yt[i][0],yt[i][1],yt[i][2]))
+        yl = [(-.05, 1.05), (-.05, 1.05), (-.05, 1.05), (-20, 920), (-0.4, 8), (-0.4, 8)]
+        ax.set_ylim([yl[i][0], yl[i][1]])
         sns.despine(ax=ax, bottom=True, trim=True)
         ax.set_xticklabels(['+', '-'])
         ax.set_xlabel('Amino acids')
         #ax.set_ylabel('Transition\nprobability to\n{}'.format(patchlab[i]))
-        ax.set_ylabel('Mean dist.\ntraveled between\nyeast patches [mm]')
+        ax.set_ylabel(patchlab[i])
 
         plt.tight_layout()
         suffix = ''
         if onlyAA: suffix= '_aa'
-        _file = os.path.join(outfolder, "{}_{}.png".format(_outfile+suffix, each))
+        _file = os.path.join(outfolder, "{}_{}_{}.png".format(_outfile+suffix, each, patchid[i]))
         plt.savefig(_file, dpi=300)
         plt.cla()
         plt.clf()
