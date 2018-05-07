@@ -83,7 +83,7 @@ def main():
                     print(2*(j+1), len(transitions))
                     Ntrans = len(transitions)
                     same, near, far, avg_dist, avg_hsp, avg_bsp = 0, 0, 0, 0.0, 0.0, 0.0
-                    for index in transitions:
+                    for itrans, index in enumerate(transitions):
                         xy = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]][['body_x', 'body_y']]
                         hsp = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['sm_head_speed']
                         bsp = per_frame_df.iloc[pos[index]+lens[index]:pos[index+1]]['sm_body_speed']
@@ -95,6 +95,7 @@ def main():
                         dx, dy = np.append(0, np.diff(x)), np.append(0, np.diff(y))
                         ##dx, dy = np.divide(dx,dt), np.divide(dy,dt)
                         dist_travelled = np.sum(np.sqrt(dx*dx + dy*dy))
+                        print(itrans, pos[index]+lens[index], pos[index+1], dist_travelled)
                         avg_dist += dist_travelled
                         avg_hsp += np.nanmean(hsp)
                         avg_bsp += np.nanmean(bsp)
@@ -164,7 +165,7 @@ def main():
         patchid = ['far_patch', 'near_patch', 'same_patch', 'avg_dist', 'avg_hsp', 'avg_bsp']
         patchlab = ['distant {}'.format(each), 'adjacent {}'.format(each), 'same {}'.format(each), 'Mean dist.\ntraveled between\nyeast patches [mm]', 'Mean speed\nbetween yeast\npatches [mm/s]', 'Mean speed\nbetween yeast\npatches [mm/s]']
         #for i, ax in enumerate(axes):
-        i=5
+        i=3
         print(conds)
         if onlyAA: ax = swarmbox(ax=ax, x='condition', y=patchid[i], data=rdata, palette={'+': '#b353b5', '-': '#cc0000'}, compare=[('+', '-')])
         else:
